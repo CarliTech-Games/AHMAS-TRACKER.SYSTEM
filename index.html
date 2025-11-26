@@ -1088,9 +1088,7 @@
                                     }).map(u=>(
                                         <div 
                                             key={u.id} 
-                                            className="p-4 border-b flex justify-between items-center cursor-pointer hover:bg-slate-50 transition"
-                                            // Only Owner Admin can trigger the edit modal
-                                            onClick={() => { if (user.username === 'admin') setEditUserModal({ isOpen: true, user: u, newPin: '' }); }}
+                                            className="p-4 border-b flex justify-between items-center hover:bg-slate-50 transition"
                                         >
                                             <div>
                                                 <h3 className="font-bold">{u.name} {u.username === 'admin' && <span className="text-xs font-mono text-logo-green-700 bg-logo-green-100 px-1 rounded-sm">OWNER</span>}</h3>
@@ -1098,15 +1096,29 @@
                                                     @{u.username} • HASHED PIN
                                                 </p>
                                             </div>
-                                            {/* Delete button visible only to Admin (and Owner Admin) */}
-                                            {user.role === 'admin' && (
-                                                <button 
-                                                    onClick={(e)=>{e.stopPropagation(); handleDeleteUser(u.id)}} 
-                                                    className="text-slate-300 hover:text-red-500 p-1"
-                                                >
-                                                    <Icons.Trash2/>
-                                                </button>
-                                            )}
+                                            <div className="flex gap-2 items-center">
+                                                {/* NEW: Explicit View/Reset PIN button (Owner Admin only) */}
+                                                {user.username === 'admin' && (
+                                                    <button
+                                                        onClick={() => setEditUserModal({ isOpen: true, user: u, newPin: '' })}
+                                                        className="text-slate-300 hover:text-logo-green-700 p-1"
+                                                        title="View Username / Reset PIN"
+                                                    >
+                                                        <Icons.Lock size={16}/>
+                                                    </button>
+                                                )}
+
+                                                {/* Delete button visible to all Admins */}
+                                                {user.role === 'admin' && (
+                                                    <button 
+                                                        onClick={(e)=>{e.stopPropagation(); handleDeleteUser(u.id)}} 
+                                                        className="text-slate-300 hover:text-red-500 p-1"
+                                                        title="Delete User"
+                                                    >
+                                                        <Icons.Trash2 size={16}/>
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
