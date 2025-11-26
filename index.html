@@ -85,8 +85,6 @@
             'AS Fortuna'
         ];
         
-        // --- LOGO URL REMOVED ---
-        
         // --- FIREBASE CONFIGURATION (CUSTOMIZABLE FOR EXTERNAL DEPLOYMENT) ---
         const MANUAL_FIREBASE_CONFIG = {
             apiKey: "AIzaSyAKXcZwKtFBRFvGbOKd0UnQrLuOLt7wV9M",
@@ -152,8 +150,24 @@
             MapPin: (p) => <Icon name="map-pin" {...p} />
         };
 
+        // --- SECURITY HELPER: Hashing Function ---
+        const hashPin = async (pin) => {
+            if (!pin || pin.length < 4) return null;
+            try {
+                // Use subtle crypto for SHA-256 hashing
+                const msgUint8 = new TextEncoder().encode(pin);
+                const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+                const hashArray = Array.from(new Uint8Array(hashBuffer));
+                const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+                return hashHex;
+            } catch (error) {
+                console.error("Hashing failed:", error);
+                return null;
+            }
+        };
+
+
         // --- List Management Component (Admin Only) ---
-        // Service management removed, only Therapist management remains
         const ListManagement = ({ therapists, onAdd, onDelete }) => {
             const [newItemName, setNewItemName] = useState('');
             const [modal, setModal] = useState({ isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null, confirmColor: 'red' });
@@ -347,8 +361,13 @@
                 const unsubUsers = getCollection('users')
                     .onSnapshot((snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        if (data.length === 0) seedDefaultUsers(db, basePath);
-                        else setUsers(data);
+                        
+                        // Seed default users if none exist, ensuring PINs are hashed before saving
+                        if (data.length === 0) {
+                            seedDefaultUsers(db, basePath);
+                        } else {
+                            setUsers(data);
+                        }
                     }, (error) => console.error("Sync Error: Users", error));
 
                 // Therapists
@@ -375,14 +394,23 @@
                     { name: 'Morning Rec.', username: 'morning', pin: '1111', role: 'staff' },
                     { name: 'Night Rec.', username: 'night', pin: '2222', role: 'staff' }
                 ];
+                
                 const userColl = db.collection(`${basePath}/users`);
-                for (const u of defaults) await userColl.add(u);
+                
+                // Hash default PINs before seeding
+                const usersToSeed = await Promise.all(defaults.map(async u => {
+                    const hashedPin = await hashPin(u.pin);
+                    return { ...u, pin: hashedPin }; // Store the hash instead of plaintext
+                }));
+
+                for (const u of usersToSeed) await userColl.add(u);
             };
 
             useEffect(() => {
                 if (view === 'profile' && user) {
                     const freshUser = users.find(u => u.id === user.id) || user;
-                    setProfileData({ username: freshUser.username, pin: freshUser.pin });
+                    // Note: We intentionally don't display the stored PIN hash, just name/username
+                    setProfileData({ username: freshUser.username, pin: '' }); // PIN field starts empty for security
                 }
             }, [view, user, users]);
 
@@ -540,14 +568,23 @@
             };
             
 
-            const handleLoginSubmit = (e) => {
+            const handleLoginSubmit = async (e) => {
                 e.preventDefault();
                 if (!loginBranch) {
                     setModal({ isOpen: true, type: 'alert', title: 'Branch Required', message: 'Please select your branch location.', onConfirm: closeModal, confirmColor: 'red' });
                     return;
                 }
+                
+                // 1. Hash the entered PIN
+                const hashedPinAttempt = await hashPin(loginPin);
+                if (!hashedPinAttempt) {
+                    setModal({ isOpen: true, type: 'alert', title: 'Login Error', message: 'PIN must be at least 4 digits.', onConfirm: closeModal, confirmColor: 'red' });
+                    return;
+                }
 
-                const found = users.find(u => u.username.toLowerCase() === loginUsername.toLowerCase() && u.pin === loginPin);
+                // 2. Find user by username and compare HASHED PIN
+                const found = users.find(u => u.username.toLowerCase() === loginUsername.toLowerCase() && u.pin === hashedPinAttempt);
+                
                 if (found) {
                     setUser({ ...found, currentBranch: loginBranch });
                     setLoginUsername(''); setLoginPin(''); setLoginBranch(''); setView('dashboard');
@@ -663,14 +700,24 @@
             const handleAddUser = async (e) => {
                 e.preventDefault();
                 if (!newUser.name || !newUser.username || !newUser.pin) return;
+                
+                // Hash new user PIN before storing
+                const hashedPin = await hashPin(newUser.pin);
+                if (!hashedPin) {
+                    setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'PIN hashing failed. Check PIN length.', onConfirm: closeModal, confirmColor: 'red' });
+                    return;
+                }
+
                 if (users.some(u => u.username.toLowerCase() === newUser.username.toLowerCase())) { 
                     setModal({ isOpen: true, type: 'alert', title: 'Username Taken', message: 'This username is already in use.', onConfirm: closeModal, confirmColor: 'red' });
                     return; 
                 }
+                
                 const basePath = `artifacts/${fb.appId}/public/data`;
-                await fb.db.collection(`${basePath}/users`).add(newUser);
+                await fb.db.collection(`${basePath}/users`).add({ ...newUser, pin: hashedPin });
                 setNewUser({ name: '', username: '', pin: '', role: 'staff' });
             };
+
             const handleDeleteUser = (id) => {
                 if (users.length <= 1) { 
                     setModal({ isOpen: true, type: 'alert', title: 'Action Denied', message: 'Cannot delete the last remaining user.', onConfirm: closeModal, confirmColor: 'red' });
@@ -682,15 +729,34 @@
                     closeModal(); 
                 }});
             };
+
             const handleUpdateProfile = async (e) => {
                 e.preventDefault();
+                
+                // PIN is optional for update, but if provided, must be hashed
+                const newPin = profileData.pin;
+                const updateData = { username: profileData.username };
+
+                if (newPin && newPin.length > 0) {
+                    const hashedPin = await hashPin(newPin);
+                     if (!hashedPin) {
+                        setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'New PIN hashing failed. Check PIN length.', onConfirm: closeModal, confirmColor: 'red' });
+                        return;
+                    }
+                    updateData.pin = hashedPin;
+                }
+
                 if (users.some(u => u.username.toLowerCase() === profileData.username.toLowerCase() && u.id !== user.id)) { 
                     setModal({ isOpen: true, type: 'alert', title: 'Username Taken', message: 'This username is already in use by another staff.', onConfirm: closeModal, confirmColor: 'red' });
                     return; 
                 }
+                
                 const basePath = `artifacts/${fb.appId}/public/data`;
-                await fb.db.collection(`${basePath}/users`).doc(user.id).update(profileData);
-                setUser({ ...user, ...profileData });
+                await fb.db.collection(`${basePath}/users`).doc(user.id).update(updateData);
+                
+                // Update local user state, keeping the old pin hash if no new pin was provided
+                const updatedUser = { ...user, ...updateData };
+                setUser(updatedUser);
                 setModal({ isOpen: true, type: 'alert', title: 'Updated', message: 'Credentials synced.', onConfirm: closeModal, confirmColor: 'logo-green' });
             };
 
@@ -911,6 +977,7 @@
                                         {/* Therapist Dropdown (Managed List) */}
                                         <select required value={formData.therapist} onChange={e=>setFormData({...formData, therapist:e.target.value})} className="w-full p-3 border rounded-xl bg-slate-50 appearance-none">
                                             <option value="" disabled>Select Therapist*</option>
+                                            {/* Note: Services list was intentionally removed for flexibility, but Therapists list remains */}
                                             {therapistsList.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
                                         </select>
                                     </div>
@@ -937,7 +1004,7 @@
                                 <div className="bg-slate-50 p-4 rounded-xl border mb-6"><p className="text-xs text-slate-400 uppercase font-bold">Account</p><p className="font-bold text-logo-green-800 text-lg">{user.name}</p></div>
                                 <form onSubmit={handleUpdateProfile} className="space-y-4">
                                     <input required value={profileData.username} onChange={e=>setProfileData({...profileData, username:e.target.value})} className="w-full p-3 border rounded-lg" placeholder="New Username"/>
-                                    <input required type="text" inputMode="numeric" maxLength="4" value={profileData.pin} onChange={e=>setProfileData({...profileData, pin:e.target.value})} className="w-full p-3 border rounded-lg font-mono" placeholder="New PIN"/>
+                                    <input type="password" inputMode="numeric" maxLength="4" value={profileData.pin} onChange={e=>setProfileData({...profileData, pin:e.target.value})} className="w-full p-3 border rounded-lg font-mono" placeholder="New PIN (Leave blank to keep old)"/>
                                     <button className="w-full bg-logo-green-700 text-white font-bold py-3 rounded-lg">Update Credentials</button>
                                 </form>
                             </div>
@@ -969,7 +1036,7 @@
                                             <div>
                                                 <h3 className="font-bold">{u.name} {u.username === 'admin' && <span className="text-xs font-mono text-logo-green-700 bg-logo-green-100 px-1 rounded-sm">OWNER</span>}</h3>
                                                 <p className="text-xs text-slate-400">
-                                                    @{u.username} • PIN: {u.pin}
+                                                    @{u.username} • HASHED PIN
                                                 </p>
                                             </div>
                                             {/* Delete button visible only to Admin (and Owner Admin) */}
@@ -989,7 +1056,7 @@
                                     <form onSubmit={handleAddUser} className="space-y-4">
                                         <input required placeholder="Name" value={newUser.name} onChange={e=>setNewUser({...newUser, name:e.target.value})} className="w-full p-2 border rounded"/>
                                         <input required placeholder="Username" value={newUser.username} onChange={e=>setNewUser({...newUser, username:e.target.value})} className="w-full p-2 border rounded"/>
-                                        <div className="flex gap-2"><input required maxLength="4" placeholder="PIN" value={newUser.pin} onChange={e=>setNewUser({...newUser, pin:e.target.value})} className="w-full p-2 border rounded"/><select value={newUser.role} onChange={e=>setNewUser({...newUser, role:e.target.value})} className="w-full p-2 border rounded"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
+                                        <div className="flex gap-2"><input required maxLength="4" placeholder="PIN (Min 4 digits)" type="password" inputMode="numeric" value={newUser.pin} onChange={e=>setNewUser({...newUser, pin:e.target.value})} className="w-full p-2 border rounded"/><select value={newUser.role} onChange={e=>setNewUser({...newUser, role:e.target.value})} className="w-full p-2 border rounded"><option value="staff">Staff</option><option value="admin">Admin</option></select></div>
                                         <button className="w-full bg-logo-green-700 text-white py-2 rounded font-bold">Add User</button>
                                     </form>
                                 </div>
