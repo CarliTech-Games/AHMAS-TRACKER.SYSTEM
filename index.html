@@ -85,11 +85,8 @@
             'AS Fortuna'
         ];
         
-        // --- IMPORTANT: LOGO URL ---
-        // Using the direct image URL provided by the user:
-        const LOGO_URL = "https://consistent-lavender-9rdupa9zdt-xsj362mddy.edgeone.dev/452677662_959862286153937_9117660114627658359_n.jpg"; 
-
-
+        // --- LOGO URL REMOVED ---
+        
         // --- FIREBASE CONFIGURATION (CUSTOMIZABLE FOR EXTERNAL DEPLOYMENT) ---
         const MANUAL_FIREBASE_CONFIG = {
             apiKey: "AIzaSyAKXcZwKtFBRFvGbOKd0UnQrLuOLt7wV9M",
@@ -726,14 +723,8 @@
                         <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-logo-green-100 text-center relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-logo-green-700 to-teal-600"></div>
                             <div className="w-20 h-20 bg-logo-green-50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm border border-logo-green-100">
-                                {/* START: Logo integration on Login screen */}
-                                <img 
-                                    src={LOGO_URL} 
-                                    alt="At HOME Massage & Spa Logo" 
-                                    className="logo-img p-2"
-                                    onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/80x80/10b981/ffffff?text=AHS"; }}
-                                />
-                                {/* END: Logo integration on Login screen */}
+                                {/* Logo replaced with icon */}
+                                <Icons.Lock size={32} className="text-logo-green-700" />
                             </div>
                             <h1 className="text-2xl font-bold text-logo-green-900 mb-1">At HOME Massage & Spa</h1>
                             <p className="text-slate-500 mb-6 text-sm">Staff Portal</p>
@@ -765,16 +756,8 @@
                     <header className="bg-white border-b border-logo-green-100 sticky top-0 z-20 shadow-sm">
                         <div className="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center">
                             <div className="flex items-center gap-3">
-                                {/* START: Logo integration on Header */}
-                                <div className={`w-8 h-8 rounded-lg shadow-md bg-logo-green-50 flex items-center justify-center`}>
-                                    <img 
-                                        src={LOGO_URL} 
-                                        alt="Logo" 
-                                        className="logo-img p-0.5"
-                                        onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/32x32/10b981/ffffff?text=AHS"; }}
-                                    />
-                                </div>
-                                {/* END: Logo integration on Header */}
+                                {/* Logo replaced with icon */}
+                                <div className={`p-2 rounded-lg shadow-md ${user.role==='admin'?'bg-logo-green-700 shadow-logo-green-200':'bg-slate-600 shadow-slate-200'}`}><Icons.Home size={22} className="text-white"/></div>
                                 <div>
                                     <h1 className="text-lg font-bold text-logo-green-800 leading-tight">At HOME Massage & Spa</h1>
                                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">
