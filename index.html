@@ -788,8 +788,10 @@
                 
                 const updatePresence = () => {
                     const basePath = `artifacts/${fb.appId}/public/data`;
+                    // ALSO Update current branch here to keep it fresh in DB
                     fb.db.collection(`${basePath}/users`).doc(user.id).update({
-                        lastActive: firebase.firestore.FieldValue.serverTimestamp()
+                        lastActive: firebase.firestore.FieldValue.serverTimestamp(),
+                        currentBranch: user.currentBranch // Ensure DB knows where they are
                     }).catch(err => console.error("Presence update failed", err));
                 };
 
@@ -1076,9 +1078,18 @@
                             setModal({ isOpen: true, type: 'alert', title: 'Access Denied', message: 'Only the Owner Admin can access the All Branches view.', onConfirm: closeModal, confirmColor: 'red' });
                             return;
                         }
+                        
                         const loggedUser = { ...found, currentBranch: loginBranch };
+                        
+                        // UPDATE FIRESTORE WITH LOGIN BRANCH
+                        const basePath = `artifacts/${fb.appId}/public/data`;
+                        await fb.db.collection(`${basePath}/users`).doc(found.id).update({ 
+                            currentBranch: loginBranch,
+                            lastActive: firebase.firestore.FieldValue.serverTimestamp() 
+                        });
+
                         setUser(loggedUser);
-                        localStorage.setItem('spa_user', JSON.stringify(loggedUser)); // NEW: Save to local storage
+                        localStorage.setItem('spa_user', JSON.stringify(loggedUser));
                         setLoginUsername(''); setLoginPin(''); setLoginBranch(''); setView('dashboard');
                     } else {
                         setModal({ isOpen: true, type: 'alert', title: 'Login Failed', message: 'Check credentials.', onConfirm: closeModal, confirmColor: 'red' });
@@ -1329,7 +1340,14 @@
                     }
                     
                     const basePath = `artifacts/${fb.appId}/public/data`;
-                    await fb.db.collection(`${basePath}/users`).add({ ...newUser, pin: hashedPin });
+                    const newUserPayload = { ...newUser, pin: hashedPin };
+                    
+                    // SMART ADD: Auto-tag with creator's branch if not owner/ALL
+                    if (user.currentBranch !== 'ALL') {
+                        newUserPayload.currentBranch = user.currentBranch;
+                    }
+
+                    await fb.db.collection(`${basePath}/users`).add(newUserPayload);
                     setNewUser({ name: '', username: '', pin: '', role: 'staff' });
                 } catch(err) {
                     setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'Failed to add user.', confirmColor: 'red', onConfirm: closeModal });
@@ -1553,7 +1571,15 @@
                                 <>
                                     <button onClick={()=>setView('lists')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='lists'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.ShieldCheck size={16}/> Lists</button>
                                     <button onClick={()=>setView('history')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='history'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.History size={16}/> History</button>
-                                    <button onClick={()=>setView('team')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='team'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.Users size={16}/> Team</button>
+                                    <button onClick={()=>setView('team')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='team'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'} relative`}>
+                                        <Icons.Users size={16}/> Team
+                                        {/* Badge on Navigation Tab */}
+                                        {(() => {
+                                            if (user.username !== 'admin') return null;
+                                            const count = users.filter(u => isUserOnline(u.lastActive)).length;
+                                            return count > 0 ? <span className="absolute -top-1 -right-1 bg-green-500 text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white animate-pulse">{count}</span> : null;
+                                        })()}
+                                    </button>
                                 </>
                             )}
                         </div>
@@ -1753,13 +1779,27 @@
                                 <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                                     {users.filter(u => {
                                         // Owner Admin sees everyone
-                                        if (user.username === 'admin') {
-                                            return true;
-                                        }
+                                        if (user.username === 'admin') return true;
 
-                                        // Regular Admin/Staff only sees staff accounts OR themselves
-                                        return u.id === user.id || u.role === 'staff';
-                                    }).map(u=>(
+                                        // Regular Admin sees themselves
+                                        if (u.id === user.id) return true;
+
+                                        // Regular Admin sees staff/admins in their branch
+                                        // We exclude the Owner ('admin') from regular views to avoid clutter
+                                        if (u.username === 'admin') return false;
+
+                                        return u.currentBranch === user.currentBranch;
+                                    })
+                                    .sort((a, b) => {
+                                        // Sort by Online status first
+                                        const aOnline = isUserOnline(a.lastActive);
+                                        const bOnline = isUserOnline(b.lastActive);
+                                        if (aOnline && !bOnline) return -1;
+                                        if (!aOnline && bOnline) return 1;
+                                        // Then by Name
+                                        return a.name.localeCompare(b.name);
+                                    })
+                                    .map(u=>(
                                         <div 
                                             key={u.id} 
                                             className="p-4 border-b flex justify-between items-center hover:bg-slate-50 transition"
@@ -1778,7 +1818,7 @@
                                                     )}
                                                 </h3>
                                                 <p className="text-xs text-slate-400">
-                                                    @{u.username} • HASHED PIN
+                                                    @{u.username} • {u.currentBranch || 'Unknown Branch'}
                                                 </p>
                                             </div>
                                             <div className="flex gap-2 items-center">
