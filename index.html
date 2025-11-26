@@ -278,6 +278,8 @@
 
             // Utility to close modal
             const closeModal = () => setModal({ ...modal, isOpen: false });
+            const closeEditUserModal = () => setEditUserModal({ isOpen: false, user: null, newPin: '' });
+
 
             // --- 1. INITIALIZE FIREBASE ---
             useEffect(() => {
@@ -1100,7 +1102,7 @@
                                                 {/* NEW: Explicit View/Reset PIN button (Owner Admin only) */}
                                                 {user.username === 'admin' && (
                                                     <button
-                                                        onClick={() => setEditUserModal({ isOpen: true, user: u, newPin: '' })}
+                                                        onClick={(e)=>{e.stopPropagation(); setEditUserModal({ isOpen: true, user: u, newPin: '' });}}
                                                         className="text-slate-300 hover:text-logo-green-700 p-1"
                                                         title="View Username / Reset PIN"
                                                     >
@@ -1171,14 +1173,22 @@
                             </div>
                         )}
 
+                        {/* Global Modal */}
                         {modal.isOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60"><div className="bg-white rounded-xl p-6 max-w-sm"><h3 className="font-bold mb-2">{modal.title}</h3><p className="mb-4 text-sm">{modal.message}</p><div className="flex gap-2 justify-end">{modal.type==='confirm'&&<button onClick={closeModal} className="px-4 py-2 text-slate-500">Cancel</button>}<button onClick={modal.onConfirm||closeModal} className={`px-4 py-2 rounded text-white ${modal.confirmColor==='red'?'bg-red-500':'bg-logo-green-600'}`}>Okay</button></div></div></div>}
                     </main>
                     {view === 'dashboard' && <button onClick={()=>setView('add')} className="fixed bottom-6 right-6 bg-logo-green-700 text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform"><Icons.Plus size={28}/></button>}
+
+                    {/* Admin Reset User Modal is rendered inside App component now */}
+                    <AdminResetUserModal 
+                        editUserModal={editUserModal} 
+                        setEditUserModal={setEditUserModal} 
+                        handleResetPin={handleResetPin}
+                    />
                 </div>
             );
         };
         
-        // NEW: Admin Reset User Modal Component (Displayed outside of the main App flow)
+        // NEW: Admin Reset User Modal Component (Defined outside of the main App function)
         const AdminResetUserModal = ({ editUserModal, setEditUserModal, handleResetPin }) => {
             if (!editUserModal.isOpen || !editUserModal.user) return null;
 
@@ -1237,22 +1247,7 @@
 
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<><App /><AdminResetUserModal editUserModal={window.editUserModal} setEditUserModal={window.setEditUserModal} handleResetPin={window.handleResetPin} /></>);
-        
-        // Expose state and handler for the modal component rendered outside the main App loop
-        // Note: This is an unusual React pattern used only in this specific, constrained single-file Babel environment.
-        window.editUserModal = { isOpen: false, user: null, newPin: '' };
-        window.setEditUserModal = (val) => {
-            window.editUserModal = val;
-            root.render(<><App /><AdminResetUserModal editUserModal={window.editUserModal} setEditUserModal={window.setEditUserModal} handleResetPin={window.handleResetPin} /></>);
-        };
-        window.handleResetPin = (e) => {
-             // To ensure the handler is available globally, it wraps the internal app logic
-            const appInstance = document.getElementById('root')._reactRootContainer._internalRoot.current.memoizedState.element.props.children[0].type;
-            const instance = new appInstance({});
-            Object.assign(instance, document.getElementById('root')._reactRootContainer._internalRoot.current.memoizedState.element.props.children[0].props);
-            instance.handleResetPin(e);
-        };
+        root.render(<App />);
     </script>
 </body>
 </html>
