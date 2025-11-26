@@ -273,6 +273,9 @@
                 isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null, confirmColor: 'red'
             });
 
+            // NEW: State for Admin to view/edit another user
+            const [editUserModal, setEditUserModal] = useState({ isOpen: false, user: null, newPin: '' });
+
             // Utility to close modal
             const closeModal = () => setModal({ ...modal, isOpen: false });
 
@@ -370,7 +373,6 @@
                         }
 
                         // HASH CONVERSION LOGIC: Check if default users need their PINs hashed.
-                        // This handles the transition from plaintext (e.g., '8888') to hashed pins.
                         const needsUpdate = data.filter(u => u.username === 'admin' || u.username === 'morning' || u.username === 'night');
                         
                         let shouldWait = false;
@@ -781,6 +783,36 @@
                 setUser(updatedUser);
                 setModal({ isOpen: true, type: 'alert', title: 'Updated', message: 'Credentials synced.', onConfirm: closeModal, confirmColor: 'logo-green' });
             };
+            
+            // NEW: Admin PIN Reset Handler
+            const handleResetPin = async (e) => {
+                e.preventDefault();
+                const targetUser = editUserModal.user;
+                const newPin = editUserModal.newPin;
+
+                if (newPin.length < 4) {
+                    setModal({ isOpen: true, type: 'alert', title: 'PIN Error', message: 'New PIN must be at least 4 digits.', onConfirm: closeModal, confirmColor: 'red' });
+                    return;
+                }
+                
+                const hashedPin = await hashPin(newPin);
+                if (!hashedPin) {
+                    setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'PIN hashing failed.', onConfirm: closeModal, confirmColor: 'red' });
+                    return;
+                }
+
+                try {
+                    const basePath = `artifacts/${fb.appId}/public/data`;
+                    await fb.db.collection(`${basePath}/users`).doc(targetUser.id).update({ pin: hashedPin });
+                    
+                    setModal({ isOpen: true, type: 'alert', title: 'Success', message: `${targetUser.name}'s PIN has been reset.`, onConfirm: () => {
+                        setEditUserModal({ isOpen: false, user: null, newPin: '' });
+                        closeModal();
+                    }, confirmColor: 'logo-green' });
+                } catch (error) {
+                    setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'Failed to update PIN: ' + error.message, onConfirm: closeModal, confirmColor: 'red' });
+                }
+            };
 
             // --- RENDER ---
 
@@ -1054,7 +1086,12 @@
                                         // Regular Admin/Staff only sees staff accounts OR themselves
                                         return u.id === user.id || u.role === 'staff';
                                     }).map(u=>(
-                                        <div key={u.id} className="p-4 border-b flex justify-between items-center">
+                                        <div 
+                                            key={u.id} 
+                                            className="p-4 border-b flex justify-between items-center cursor-pointer hover:bg-slate-50 transition"
+                                            // Only Owner Admin can trigger the edit modal
+                                            onClick={() => { if (user.username === 'admin') setEditUserModal({ isOpen: true, user: u, newPin: '' }); }}
+                                        >
                                             <div>
                                                 <h3 className="font-bold">{u.name} {u.username === 'admin' && <span className="text-xs font-mono text-logo-green-700 bg-logo-green-100 px-1 rounded-sm">OWNER</span>}</h3>
                                                 <p className="text-xs text-slate-400">
@@ -1064,8 +1101,8 @@
                                             {/* Delete button visible only to Admin (and Owner Admin) */}
                                             {user.role === 'admin' && (
                                                 <button 
-                                                    onClick={()=>handleDeleteUser(u.id)} 
-                                                    className="text-slate-300 hover:text-red-500"
+                                                    onClick={(e)=>{e.stopPropagation(); handleDeleteUser(u.id)}} 
+                                                    className="text-slate-300 hover:text-red-500 p-1"
                                                 >
                                                     <Icons.Trash2/>
                                                 </button>
@@ -1128,9 +1165,82 @@
                 </div>
             );
         };
+        
+        // NEW: Admin Reset User Modal Component (Displayed outside of the main App flow)
+        const AdminResetUserModal = ({ editUserModal, setEditUserModal, handleResetPin }) => {
+            if (!editUserModal.isOpen || !editUserModal.user) return null;
+
+            const user = editUserModal.user;
+            
+            return (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 fade-in">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-sm">
+                        <h3 className="text-xl font-bold text-logo-green-800 mb-4 flex items-center gap-2">
+                            <Icons.UserCog size={24}/> Reset Staff Credentials
+                        </h3>
+
+                        <div className="bg-slate-50 p-4 rounded-lg mb-4">
+                            <p className="text-xs text-slate-500 uppercase font-bold">Staff Name:</p>
+                            <p className="font-bold text-slate-800 text-lg mb-2">{user.name}</p>
+
+                            <p className="text-xs text-slate-500 uppercase font-bold">Username:</p>
+                            <p className="font-mono text-logo-green-700 text-sm">@{user.username}</p>
+                        </div>
+
+                        <form onSubmit={handleResetPin} className="space-y-4">
+                            <label className="block">
+                                <span className="text-sm font-semibold text-slate-700 block mb-1">Set New PIN (4+ Digits)</span>
+                                <input
+                                    required
+                                    type="password"
+                                    inputMode="numeric"
+                                    maxLength="4"
+                                    value={editUserModal.newPin}
+                                    onChange={(e) => setEditUserModal({ ...editUserModal, newPin: e.target.value })}
+                                    placeholder="Enter new 4-digit PIN"
+                                    className="w-full p-3 border rounded-lg font-mono focus:ring-2 focus:ring-logo-green-500"
+                                />
+                            </label>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => setEditUserModal({ isOpen: false, user: null, newPin: '' })} 
+                                    className="px-4 py-2 text-slate-500 rounded hover:bg-slate-100"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    type="submit" 
+                                    className="px-4 py-2 rounded text-white bg-logo-green-600 hover:bg-logo-green-700 font-bold"
+                                >
+                                    Reset PIN
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(<><App /><AdminResetUserModal editUserModal={window.editUserModal} setEditUserModal={window.setEditUserModal} handleResetPin={window.handleResetPin} /></>);
+        
+        // Expose state and handler for the modal component rendered outside the main App loop
+        // Note: This is an unusual React pattern used only in this specific, constrained single-file Babel environment.
+        window.editUserModal = { isOpen: false, user: null, newPin: '' };
+        window.setEditUserModal = (val) => {
+            window.editUserModal = val;
+            root.render(<><App /><AdminResetUserModal editUserModal={window.editUserModal} setEditUserModal={window.setEditUserModal} handleResetPin={window.handleResetPin} /></>);
+        };
+        window.handleResetPin = (e) => {
+             // To ensure the handler is available globally, it wraps the internal app logic
+            const appInstance = document.getElementById('root')._reactRootContainer._internalRoot.current.memoizedState.element.props.children[0].type;
+            const instance = new appInstance({});
+            Object.assign(instance, document.getElementById('root')._reactRootContainer._internalRoot.current.memoizedState.element.props.children[0].props);
+            instance.handleResetPin(e);
+        };
     </script>
 </body>
 </html>
