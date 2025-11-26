@@ -359,15 +359,37 @@
 
                 // Users
                 const unsubUsers = getCollection('users')
-                    .onSnapshot((snapshot) => {
+                    .onSnapshot(async (snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        const userColl = getCollection('users');
                         
-                        // Seed default users if none exist, ensuring PINs are hashed before saving
+                        // Check if users exist. If not, seed them (will hash PINs)
                         if (data.length === 0) {
                             seedDefaultUsers(db, basePath);
-                        } else {
+                            return; // Wait for the next snapshot
+                        }
+
+                        // HASH CONVERSION LOGIC: Check if default users need their PINs hashed.
+                        // This handles the transition from plaintext (e.g., '8888') to hashed pins.
+                        const needsUpdate = data.filter(u => u.username === 'admin' || u.username === 'morning' || u.username === 'night');
+                        
+                        let shouldWait = false;
+                        for (const u of needsUpdate) {
+                            if (u.pin === '8888' || u.pin === '1111' || u.pin === '2222') {
+                                // Pin is plaintext, needs hashing and update
+                                console.log(`Updating plaintext PIN for user: ${u.username}`);
+                                const hashedPin = await hashPin(u.pin);
+                                // Use set to update the document by ID
+                                await userColl.doc(u.id).update({ pin: hashedPin });
+                                shouldWait = true;
+                            }
+                        }
+                        
+                        // If any update happened, wait for the next snapshot where data will be correctly hashed.
+                        if (!shouldWait) {
                             setUsers(data);
                         }
+
                     }, (error) => console.error("Sync Error: Users", error));
 
                 // Therapists
