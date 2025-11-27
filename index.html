@@ -5,25 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>At HOME Massage & Spa Tracker</title>
     
-    <!-- 1. Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 2. React & ReactDOM -->
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     
-    <!-- 3. Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- 4. Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
 
-    <!-- 5. Firebase (Compat Version - CDN for single-file operation) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
-    <!-- 6. Custom Tailwind Config and Styles -->
     <script>
         // Custom Tailwind Configuration to use the Logo's Primary Green (#008000)
         tailwind.config = {
@@ -150,7 +144,8 @@
             Tag: (p) => <Icon name="tag" {...p} />,
             Hourglass: (p) => <Icon name="hourglass" {...p} />,
             Pencil: (p) => <Icon name="pencil" {...p} />,
-            Loader2: (p) => <Icon name="loader-2" {...p} />
+            Loader2: (p) => <Icon name="loader-2" {...p} />,
+            ClipboardList: (p) => <Icon name="clipboard-list" {...p} /> // NEW Icon for Notes
         };
 
         // --- SECURITY HELPER: Hashing Function ---
@@ -516,10 +511,11 @@
                 service: '', 
                 therapist: '', 
                 amount: '', 
-                duration: '', // Added Duration
+                duration: '', 
                 type: 'booking', 
                 time: new Date().toTimeString().slice(0, 5),
-                targetBranch: ''
+                targetBranch: '',
+                notes: '' // ⬅️ NEW: Service Notes Field
             });
             const [modal, setModal] = useState({
                 isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null, confirmColor: 'red'
@@ -927,18 +923,19 @@
 
 
             const downloadCSV = (record) => {
-                const headers = ['Date', 'Branch', 'Time', 'Client Name', 'Service', 'Duration', 'Therapist', 'Amount', 'Status', 'Recorded By'];
+                const headers = ['Date', 'Branch', 'Time', 'Client Name', 'Service', 'Duration', 'Therapist', 'Amount', 'Status', 'Recorded By', 'Notes']; // ⬅️ UPDATED: Added Notes
                 const rows = record.transactions.map(t => [
                     `"${record.date}"`, 
                     `"${t.branch || 'N/A'}"`, 
                     `"${t.time}"`, 
                     `"${t.clientName}"`, 
                     `"${t.service}"`,
-                    `"${t.duration || ''}"`, // Added Duration to CSV 
+                    `"${t.duration || ''}"`, 
                     `"${t.therapist}"`, 
                     t.amount, 
                     t.status, 
-                    `"${t.recordedBy || 'System'}"`
+                    `"${t.recordedBy || 'System'}"`,
+                    `"${t.notes || ''}"` // ⬅️ UPDATED: Added Notes to CSV
                 ]);
                 const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1164,9 +1161,7 @@
                 const isConflict = allBookings.some(t => 
                     t.therapist === formData.therapist && 
                     t.time === formData.time &&
-                    // Assuming therapists are branch-agnostic for validation (they can't be in two places at once)
-                    // OR if strict branch validation is needed: t.branch === transactionBranch
-                    // For safety, we assume global locking per therapist.
+                    // Assuming therapists are global-locked per schedule time
                     true
                 );
 
@@ -1175,14 +1170,21 @@
                     return;
                 }
 
+                // Payload
+                const transactionPayload = {
+                    ...formData,
+                    amount: parseFloat(formData.amount),
+                    status: formData.type === 'sale' ? 'completed' : 'pending',
+                    recordedBy: user.name,
+                    branch: transactionBranch,
+                    notes: formData.notes.trim() // ⬅️ NEW: Include Notes in payload
+                };
+
+
                 // OFFLINE HANDLING
                 if (!isOnline) {
                     const newOfflineItem = {
-                        ...formData,
-                        amount: parseFloat(formData.amount),
-                        status: formData.type === 'sale' ? 'completed' : 'pending',
-                        recordedBy: user.name,
-                        branch: transactionBranch,
+                        ...transactionPayload,
                         localId: Date.now(), // Temp ID
                         timestamp: Date.now() // Local timestamp
                     };
@@ -1192,7 +1194,8 @@
                     const resetTargetBranch = user.currentBranch === 'ALL' ? transactionBranch : user.currentBranch;
                     setFormData({ 
                         clientName: '', service: '', duration: '', therapist: '', amount: '', 
-                        type: 'booking', time: new Date().toTimeString().slice(0, 5), targetBranch: resetTargetBranch
+                        type: 'booking', time: new Date().toTimeString().slice(0, 5), 
+                        targetBranch: resetTargetBranch, notes: '' // ⬅️ NEW: Reset Notes
                     });
 
                     setModal({ isOpen: true, type: 'alert', title: 'Saved Offline', message: 'Booking queued. Will sync when online.', onConfirm: closeModal, confirmColor: 'orange' });
@@ -1204,11 +1207,7 @@
                 try {
                     const basePath = `artifacts/${fb.appId}/public/data`;
                     await fb.db.collection(`${basePath}/transactions`).add({
-                        ...formData,
-                        amount: parseFloat(formData.amount),
-                        status: formData.type === 'sale' ? 'completed' : 'pending',
-                        recordedBy: user.name,
-                        branch: transactionBranch, 
+                        ...transactionPayload,
                         // SECURE: Use Server Timestamp instead of Client Date
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
@@ -1223,7 +1222,8 @@
                         amount: '', 
                         type: 'booking', 
                         time: new Date().toTimeString().slice(0, 5),
-                        targetBranch: resetTargetBranch
+                        targetBranch: resetTargetBranch,
+                        notes: '' // ⬅️ NEW: Reset Notes
                     });
                     
                     setModal({ isOpen: true, type: 'alert', title: 'Booking Saved!', message: `${formData.clientName} recorded for ${transactionBranch}.`, onConfirm: closeModal, confirmColor: 'logo-green' });
@@ -1661,8 +1661,8 @@
                                     {filteredTransactions.length===0?<div className="text-center py-12 border border-dashed rounded-xl text-slate-400 text-sm">No bookings found for the current filter.</div>:
                                     <div className="space-y-3">
                                         {filteredTransactions.map(t=>(
-                                            <div key={t.id} className={`bg-white p-4 rounded-xl border-l-[6px] flex justify-between items-center ${t.status==='completed'?'border-l-logo-green-500':'border-l-orange-400'} shadow-sm`}>
-                                                <div className="flex-1">
+                                            <div key={t.id} className={`bg-white p-4 rounded-xl border-l-[6px] flex justify-between items-start ${t.status==='completed'?'border-l-logo-green-500':'border-l-orange-400'} shadow-sm`}>
+                                                <div className="flex-1 pr-4">
                                                     {/* Displaying timestamp date for consistency */}
                                                     <div className="flex gap-2 mb-1 items-center">
                                                         <span className="text-[10px] font-bold bg-slate-100 px-2 rounded text-slate-500">{t.branch}</span>
@@ -1674,8 +1674,16 @@
                                                         {t.duration && <span> • {t.duration}</span>}
                                                         <span> • {t.therapist}</span>
                                                     </div>
+                                                    {/* ⬅️ NEW: Display Notes */}
+                                                    {t.notes && t.notes.trim() && (
+                                                        <div className="mt-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 text-slate-700 flex items-start gap-1">
+                                                            <Icons.ClipboardList size={14} className="min-w-[14px] text-logo-green-700 mt-[2px]"/>
+                                                            <span className="font-medium">Notes: </span>
+                                                            <span className="italic">{t.notes}</span>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <div className="text-right"><div className="font-bold text-lg">{formatCurrency(t.amount)}</div><div className="flex justify-end gap-2 mt-1"><button onClick={()=>toggleStatus(t)} className={`p-1.5 rounded-full ${t.status==='completed'?'bg-logo-green-100 text-logo-green-700':'bg-orange-100 text-orange-600'}`}>{t.status==='completed'?<Icons.CheckCircle2 size={16}/>:<Icons.DollarSign size={16}/>}</button>{user.role==='admin'&&<button onClick={()=>requestDelete(t.id)} className="p-1.5 text-slate-300 hover:text-red-500"><Icons.Trash2 size={16}/></button>}</div></div>
+                                                <div className="text-right min-w-[80px]"><div className="font-bold text-lg">{formatCurrency(t.amount)}</div><div className="flex justify-end gap-2 mt-1"><button onClick={()=>toggleStatus(t)} className={`p-1.5 rounded-full ${t.status==='completed'?'bg-logo-green-100 text-logo-green-700':'bg-orange-100 text-orange-600'}`}>{t.status==='completed'?<Icons.CheckCircle2 size={16}/>:<Icons.DollarSign size={16}/>}</button>{user.role==='admin'&&<button onClick={()=>requestDelete(t.id)} className="p-1.5 text-slate-300 hover:text-red-500"><Icons.Trash2 size={16}/></button>}</div></div>
                                             </div>
                                         ))}
                                     </div>}
@@ -1733,6 +1741,15 @@
                                         </select>
                                     </div>
                                     
+                                    {/* ⬅️ NEW: Notes Textarea */}
+                                    <textarea 
+                                        placeholder="Service Notes (e.g., Hard pressure, No oil on back, Client prefers quiet)" 
+                                        rows="3"
+                                        value={formData.notes} 
+                                        onChange={e=>setFormData({...formData, notes:e.target.value})} 
+                                        className="w-full p-3 border rounded-xl bg-slate-50 resize-none"
+                                    />
+
                                     <div className="grid grid-cols-2 gap-4">
                                         {/* Price is now editable and required, auto-filled by service selection */}
                                         <input required 
@@ -1900,7 +1917,7 @@
                                                     {expandedHistoryId===h.id?<Icons.ChevronUp size={20} className="text-slate-400"/>:<Icons.ChevronDown size={20} className="text-slate-400"/>}
                                                 </div>
                                             </div>
-                                            {expandedHistoryId===h.id && <div className="bg-slate-50 p-4 border-t text-sm">{h.transactions.map((t,i)=><div key={i} className="flex justify-between py-2 border-b last:border-0"><span>{t.time} - {t.clientName} ({t.service})</span><span className="font-bold">{formatCurrency(t.amount)}</span></div>)}</div>}
+                                            {expandedHistoryId===h.id && <div className="bg-slate-50 p-4 border-t text-sm">{h.transactions.map((t,i)=><div key={i} className="flex flex-col py-2 border-b last:border-0"><div className="flex justify-between"><span>{t.time} - {t.clientName} ({t.service})</span><span className="font-bold">{formatCurrency(t.amount)}</span></div>{t.notes && t.notes.trim() && <span className="text-xs text-slate-500 italic mt-1">Notes: {t.notes}</span>}</div>)}</div>}
                                         </div>
                                     ))
                                 )}
