@@ -92,10 +92,7 @@
         };
         
         const firebaseConfig = MANUAL_FIREBASE_CONFIG;
-        // The current app ID must match the projectId for Firestore paths to work correctly.
         const currentAppId = firebaseConfig.projectId;
-        // The original code used anonymous login, so we will not pass an initial token.
-        // This is the original behavior intended by the user.
 
 
         // --- ICON COMPONENT ---
@@ -177,13 +174,22 @@
         };
 
         // --- SECURITY HELPER: Timestamp Normalizer ---
-        // Handles both legacy Date.now() numbers and Firestore Timestamp objects
         const getMillis = (ts) => {
             if (!ts) return Date.now(); // Treat pending/null as "now" so it appears at the top
             if (typeof ts === 'number') return ts; // Legacy or client-side number
             if (typeof ts.toMillis === 'function') return ts.toMillis(); // Firestore Timestamp object (V9+)
             if (ts.seconds) return ts.seconds * 1000; // Raw object fallback (V8/Compat)
             return 0;
+        };
+
+        // --- IMPROVEMENT: TIMEZONE SAFE DATE HELPER ---
+        // Returns YYYY-MM-DD based on Local Browser Time
+        const getTodayStr = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
         };
 
         // --- Loading Component ---
@@ -221,7 +227,7 @@
                 e.preventDefault();
                 let extraData = null;
                 if (activeTab === 'service') {
-                    if (durations.length === 0) return; // Guard clause
+                    if (durations.length === 0) return; 
                     extraData = newItemPrices;
                 } else if (activeTab === 'therapist') {
                     extraData = { commissionRate: parseFloat(newItemCommission) || 0 };
@@ -361,7 +367,7 @@
 
                             <button  
                                 type="submit"  
-                                disabled={isServiceAddDisabled} // Disable if no durations for service
+                                disabled={isServiceAddDisabled} 
                                 className={`w-full text-white p-3 rounded-lg font-bold transition shadow-sm ${
                                     isServiceAddDisabled
                                         ? 'bg-slate-400 cursor-not-allowed'
@@ -388,18 +394,15 @@
                                     <div key={item.id} className="p-4 border-b flex flex-col gap-2 last:border-b-0 hover:bg-slate-50">
                                         <div className="flex justify-between items-center w-full">
                                             {editingId === item.id ? (
-                                                // Edit Mode Header
                                                 <input 
                                                     value={editName}
                                                     onChange={e => setEditName(e.target.value)}
                                                     className="flex-1 p-2 border rounded text-sm bg-white focus:ring-2 focus:ring-logo-green-500 mr-2"
                                                 />
                                             ) : (
-                                                // View Mode Header
                                                 <span className="text-slate-700 font-medium">{item.name}</span>
                                             )}
                                             
-                                            {/* Actions */}
                                             <div className="flex gap-1">
                                                 {editingId === item.id ? (
                                                     <>
@@ -419,7 +422,7 @@
                                             </div>
                                         </div>
 
-                                        {/* Service Pricing Details (View & Edit) */}
+                                        {/* Service Pricing Details */}
                                         {activeTab === 'service' && (
                                             <div className="text-xs text-slate-500 w-full">
                                                 {editingId === item.id ? (
@@ -453,7 +456,7 @@
                                             </div>
                                         )}
                                         
-                                        {/* Therapist Commission Details (View & Edit) */}
+                                        {/* Therapist Commission Details */}
                                         {activeTab === 'therapist' && (
                                             <div className="text-xs text-slate-500 w-full">
                                                 {editingId === item.id ? (
@@ -555,15 +558,15 @@
             const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [dbReady, setDbReady] = useState(false);
             const [configError, setConfigError] = useState(null);  
-            const [isGlobalLoading, setIsGlobalLoading] = useState(false); // NEW: Global Loading State
+            const [isGlobalLoading, setIsGlobalLoading] = useState(false); 
 
             const [user, setUser] = useState(null);
             const [users, setUsers] = useState([]);
             const [transactions, setTransactions] = useState([]);
             const [history, setHistory] = useState([]);
             
-            // NEW: Dashboard Date Filter
-            const [dashboardDate, setDashboardDate] = useState(new Date().toISOString().split('T')[0]);
+            // IMPROVEMENT: Initialize Date using Robust Helper to avoid timezone drift
+            const [dashboardDate, setDashboardDate] = useState(getTodayStr());
 
             // NEW: Offline Queue State
             const [offlineQueue, setOfflineQueue] = useState([]);
@@ -602,14 +605,13 @@
                 therapist: '',  
                 amount: '',  
                 duration: '',  
-                type: 'booking', // booking, sale, expense
+                type: 'booking', 
                 time: new Date().toTimeString().slice(0, 5),
                 targetBranch: '',
                 notes: '',
-                category: '', // Used for Expense reason
-                // NEW FIELDS FOR HOME SERVICE / DATES
-                bookingDate: new Date().toISOString().split('T')[0],
-                location: 'spa', // 'spa' or 'home'
+                category: '', 
+                bookingDate: getTodayStr(), // Robust default
+                location: 'spa', 
                 transportFee: '' 
             });
             const [modal, setModal] = useState({
@@ -764,8 +766,6 @@
 
                         } catch (error) {
                             console.error("Sync failed", error);
-                            // Keep remaining items in queue if partial fail? 
-                            // For simplicity, we keep all if one fails to prevent data loss, or just retry next time.
                         } finally {
                             setIsGlobalLoading(false);
                         }
@@ -787,30 +787,31 @@
                 
                 let unsubTrans = () => {};
                 if (isTransactionListenerActive && view === 'dashboard') {
-                    // Transactions (Active Listener ONLY when active and on dashboard)
-                    unsubTrans = getCollection('transactions')
-                        .onSnapshot((snapshot) => {
+                    // IMPROVEMENT: SCALABILITY - Server Side Filtering
+                    // Instead of loading all data, we only load data for the selected dashboardDate.
+                    
+                    let query = getCollection('transactions');
+                    
+                    if (dashboardDate) {
+                        query = query.where('bookingDate', '==', dashboardDate);
+                    }
+
+                    unsubTrans = query.onSnapshot((snapshot) => {
                             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            // Sort by Date Descending, then Time Descending
+                            
+                            // Client-side sort
                             data.sort((a, b) => {
-                                const dateA = a.bookingDate || formatDate(a.timestamp); // Fallback for old records
-                                const dateB = b.bookingDate || formatDate(b.timestamp);
-                                if (dateA !== dateB) return dateB.localeCompare(dateA); // Newest Date First
-                                
                                 return getMillis(b.timestamp) - getMillis(a.timestamp);
                             });
+                            
                             setTransactions(data);
                             setDbReady(true);
                         }, (error) => console.error("Sync Error: Transactions", error));
                 } else if (view !== 'dashboard' && isTransactionListenerActive) {
-                    // Turn off listener if leaving dashboard view, even if active
                     setIsTransactionListenerActive(false);
-                } else if (!isTransactionListenerActive && view === 'dashboard') {
-                    // If listener is paused due to inactivity, transactions state will be stale.
-                    // We keep the old data for display and wait for reconnection.
                 }
 
-                // Users (Always Load - Needed for Login/Team Management)
+                // Users (Always Load)
                 const unsubUsers = getCollection('users')
                     .onSnapshot(async (snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -821,17 +822,15 @@
                             return;  
                         }
 
-                        // Check hash updates (One-time migration for default users for safety)
                         const needsUpdate = data.filter(u => (u.username === 'admin' && u.pin.length < 20) || (u.username === 'morning' && u.pin.length < 20) || (u.username === 'night' && u.pin.length < 20));
                         let shouldWait = false;
                         for (const u of needsUpdate) {
-                            // Check if pins are the cleartext defaults for migration
-                            if (u.pin === '8888' || u.pin === '888888') { // Owner/Admin
-                                const hashedPin = await hashPin('888888'); // Use the 6-digit default pin for hashing
+                            if (u.pin === '8888' || u.pin === '888888') { 
+                                const hashedPin = await hashPin('888888'); 
                                 await userColl.doc(u.id).update({ pin: hashedPin, role: 'admin' });  
                                 shouldWait = true;
-                            } else if (u.pin === '1111' || u.pin === '2222') { // Staff
-                                const hashedPin = await hashPin(u.pin.length === 4 ? u.pin : '1111'); // Re-hash 4-digit pins
+                            } else if (u.pin === '1111' || u.pin === '2222') { 
+                                const hashedPin = await hashPin(u.pin.length === 4 ? u.pin : '1111'); 
                                 await userColl.doc(u.id).update({ pin: hashedPin, role: 'staff' });  
                                 shouldWait = true;
                             }
@@ -875,7 +874,7 @@
                     unsubServices();
                     unsubDurations();
                 };
-            }, [fb, fbUser, isTransactionListenerActive, view]); // DEPENDENCY: isTransactionListenerActive now controls transaction sync
+            }, [fb, fbUser, isTransactionListenerActive, view, dashboardDate]); 
 
 
             // --- 2b. LAZY LOAD HISTORY (Only when View is 'history') ---
@@ -888,7 +887,11 @@
                 const { db, appId } = fb;
                 const basePath = `artifacts/${appId}/public/data`;
                 
-                const unsub = db.collection(`${basePath}/history`)
+                // IMPROVEMENT: SCALABILITY for History
+                // Limit to last 50 reports by default
+                let query = db.collection(`${basePath}/history`).orderBy('timestamp_val', 'desc');
+                
+                const unsub = query.limit(50)
                     .onSnapshot((snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         data.sort((a, b) => getMillis(b.timestamp_val) - getMillis(a.timestamp_val));
@@ -898,14 +901,13 @@
                     });
 
                 return () => unsub();
-            }, [fb, fbUser, view]);  
+            }, [fb, fbUser, view]); 
 
             // --- 2c. REAL-TIME USER ROLE SYNC ---
             useEffect(() => {
                 if (user && users.length > 0) {
                     const freshData = users.find(u => u.id === user.id);
                     if (freshData) {
-                        // Check if relevant fields changed (role, name, username)
                         if (freshData.role !== user.role || freshData.name !== user.name || freshData.username !== user.username) {
                             const updatedUser = { ...freshData, currentBranch: user.currentBranch };
                             setUser(updatedUser);
@@ -921,20 +923,19 @@
                 
                 const updatePresence = () => {
                     const basePath = `artifacts/${fb.appId}/public/data`;
-                    // ALSO Update current branch here to keep it fresh in DB
                     fb.db.collection(`${basePath}/users`).doc(user.id).update({
                         lastActive: firebase.firestore.FieldValue.serverTimestamp(),
-                        currentBranch: user.currentBranch // Ensure DB knows where they are
+                        currentBranch: user.currentBranch 
                     }).catch(err => console.error("Presence update failed", err));
                 };
 
-                updatePresence(); // Run immediately on login/load
-                const interval = setInterval(updatePresence, 60000); // Run every minute
+                updatePresence(); 
+                const interval = setInterval(updatePresence, 60000); 
 
                 return () => clearInterval(interval);
             }, [user, fb]);
 
-            // Helper: Check if a user is online (active in last 2 minutes)
+            // Helper: Check if a user is online
             const isUserOnline = (lastActive) => {
                 if (!lastActive) return false;
                 const diff = Date.now() - getMillis(lastActive);
@@ -946,7 +947,6 @@
             
             const seedDefaultUsers = async (db, basePath) => {
                 const defaults = [
-                    // MODIFIED: Admin PIN set to 6 digits
                     { name: 'Owner Admin', username: 'admin', pin: '888888', role: 'admin' },  
                     { name: 'Morning Rec.', username: 'morning', pin: '1111', role: 'staff' },  
                     { name: 'Night Rec.', username: 'night', pin: '2222', role: 'staff' }  
@@ -966,7 +966,6 @@
                 }
             }, [view, user, users]);
 
-            // Update form data's targetBranch when user or branch changes
             useEffect(() => {
                 if (user && formData.targetBranch === '' && user.currentBranch !== 'ALL') {
                     setFormData(prev => ({ ...prev, targetBranch: user.currentBranch }));
@@ -975,14 +974,11 @@
 
             const formatCurrency = (val) => {
                 if (val === undefined || val === null || val === '') return '';
-                // Handle negative display (for expenses)
                 const isNegative = val < 0;
                 const formatted = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Math.abs(val));
-                // Modified to include negative sign inside parentheses as requested: (-100)
                 return isNegative ? `(-${formatted})` : formatted;
             };
             
-            // Updated to handle Firestore Timestamps
             const formatDate = (timestamp) => {
                 const millis = getMillis(timestamp);
                 if (!millis) return 'N/A';
@@ -990,35 +986,29 @@
                 return date.toLocaleDateString();
             };
             
-            // Filter Transactions by Branch AND My Shift Toggle
+            // Filter Transactions
             const getFilteredData = () => {
                 if (!user) return [];
                 let data = transactions;
 
-                // 1. Filter by Branch (if not ALL)
                 if (user.currentBranch !== 'ALL') {
                     data = data.filter(t => t.branch === user.currentBranch);
                 }
 
-                // 2. Filter by User (if My Shift is toggled AND user is staff)
                 if (showMyShift && user.role !== 'admin') {  
                     data = data.filter(t => t.recordedBy === user.name);
                 }
                 
-                // 3. Filter by Dashboard Date (Future Bookings vs Live Records)
+                // Filter by Dashboard Date is handled server-side now, 
+                // but we keep client side check for robustness (e.g. offline queue items)
                 if (view === 'dashboard') {
                     data = data.filter(t => {
-                        // Fallback for old records without bookingDate (assume they are 'today' based on timestamp)
                         const recordDate = t.bookingDate || formatDate(t.timestamp); 
-                        // Note: formatDate returns 'M/D/YYYY' format dependent on locale, but dashboardDate is 'YYYY-MM-DD'.
-                        // Ideally we normalize.
                         
-                        // Robust Date Comparison
                         let recordDateStr = '';
                         if (t.bookingDate) {
-                            recordDateStr = t.bookingDate; // Already YYYY-MM-DD
+                            recordDateStr = t.bookingDate; 
                         } else {
-                            // Convert timestamp to YYYY-MM-DD
                             const d = new Date(getMillis(t.timestamp));
                             recordDateStr = d.toISOString().split('T')[0];
                         }
@@ -1036,34 +1026,26 @@
                 const data = filteredTransactions;
                 const salesRevenue = data.filter(t => (t.status === 'completed' || t.status === 'pending') && t.type !== 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0);
                 const completedRevenue = data.filter(t => t.status === 'completed' && t.type !== 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0);
-                
-                // Calculate total expenses
                 const totalExpenses = data.filter(t => t.type === 'expense').reduce((acc, curr) => acc + Math.abs(Number(curr.amount)), 0);
-                
                 const pendingValue = data.filter(t => t.status === 'pending' && t.type !== 'expense').reduce((acc, curr) => acc + Number(curr.amount), 0);
                 const totalBookings = data.filter(t => t.type === 'booking').length;
                 const completedSales = data.filter(t => t.status === 'completed').length;
-                
-                // Calculate Net Cash
                 const netCash = completedRevenue - totalExpenses;
 
                 return {  
-                    totalRevenue: completedRevenue, // Total actual revenue collected (completed sales)
+                    totalRevenue: completedRevenue, 
                     pendingValue,  
                     totalBookings,  
                     completedSales,
-                    totalExpenses, // Total money paid out
-                    netCash // Cash in hand (Completed Sales - Expenses)
+                    totalExpenses, 
+                    netCash 
                 };
             }, [filteredTransactions]);
 
-            // NEW: Branch-wise Financial Summary (Only calculated/shown for Owner Admin)
             const branchFinancials = useMemo(() => {
-                // Only run if the user is the Owner Admin viewing ALL branches
                 if (user?.currentBranch !== 'ALL' || user.role !== 'admin') return null;  
 
                 const grouped = {};
-                // Include all defined branches plus any unknown ones that might exist
                 const branchesToAnalyze = [...BRANCHES, 'Unknown'];
 
                 branchesToAnalyze.forEach(branch => {
@@ -1075,8 +1057,6 @@
                     };
                 });
 
-                // Use filteredTransactions (which is now filtered by Date) instead of all transactions
-                // ensuring the summary matches the selected day.
                 filteredTransactions.forEach(t => {
                     const branch = t.branch || 'Unknown';
                     const amount = Number(t.amount);
@@ -1092,30 +1072,25 @@
                         grouped[branch].netCash += amount;
                     } else if (t.type === 'expense') {
                         grouped[branch].totalExpenses += Math.abs(amount);
-                        grouped[branch].netCash += amount; // Amount is stored as negative
+                        grouped[branch].netCash += amount; 
                     }
                 });
 
-                // Convert to array, filter out empty, and sort by defined BRANCHES array order
                 return Object.entries(grouped)
                     .filter(([branch, data]) => data.count > 0 || BRANCHES.includes(branch))
                     .map(([branch, data]) => ({ branch, ...data }))
                     .sort((a, b) => {
                         const indexA = BRANCHES.indexOf(a.branch);
                         const indexB = BRANCHES.indexOf(b.branch);
-                        if (indexA === -1) return 1; // "Unknown" always last
+                        if (indexA === -1) return 1; 
                         if (indexB === -1) return -1;
                         return indexA - indexB;
                     });
 
             }, [user?.currentBranch, user?.role, filteredTransactions]);
-            // END NEW BRANCH FINANCIALS
 
-            // Therapist Stats by Branch
             const therapistStats = useMemo(() => {
                 const grouped = {};
-                
-                // Only consider completed sales transactions for commission calculation
                 const commissionableTransactions = filteredTransactions.filter(t => t.type !== 'expense' && t.status === 'completed');
 
                 commissionableTransactions.forEach(t => {
@@ -1124,18 +1099,13 @@
                     
                     if (!name) return;
 
-                    // Get therapist's rate from the master list
                     const therapist = therapistsList.find(th => th.name === name);
-                    const rate = therapist?.commissionRate || 0; // Default to 0%
+                    const rate = therapist?.commissionRate || 0; 
 
                     if (!grouped[branch]) grouped[branch] = {};
                     if (!grouped[branch][name]) grouped[branch][name] = { name, count: 0, amount: 0, commission: 0, rate };
                     
                     const amount = Number(t.amount);
-                    
-                    // Subtract transport fee from commissionable amount if applicable?
-                    // Usually commission is on SERVICE price, not transport.
-                    // Let's assume we need to deduct transport fee to find base service price.
                     let commissionableAmount = amount;
                     if (t.transportFee) {
                         commissionableAmount = amount - Number(t.transportFee);
@@ -1143,7 +1113,6 @@
 
                     grouped[branch][name].count++;
                     grouped[branch][name].amount += commissionableAmount;
-                    // Calculate commission based on rate
                     grouped[branch][name].commission += commissionableAmount * (rate / 100);
                 });
 
@@ -1155,11 +1124,9 @@
                 return result;
             }, [filteredTransactions, user, therapistsList]);
             
-            // Filtered History Logic (Updated for Branch Privacy)
             const filteredHistory = useMemo(() => {
                 let data = history;
 
-                // 1. Filter by Branch (If not Owner Admin viewing ALL)
                 if (user && user.currentBranch !== 'ALL') {
                     data = data.filter(h => h.branch === user.currentBranch);
                 }
@@ -1180,10 +1147,8 @@
             }, [history, historyStartDate, historyEndDate, user]);
 
             const downloadCSV = (record) => {
-                // --- MODIFICATION: ADD COMMISSION HEADER AND CALCULATION ---
                 const headers = ['Date', 'Branch', 'Time', 'Client Name / Description', 'Service / Category', 'Duration', 'Therapist', 'Location', 'Transport Fee', 'Total Amount', 'Commission Amount', 'Status', 'Recorded By', 'Notes'];  
                 
-                // Helper to safely get commission from archived therapist stats
                 const getCommissionForTransaction = (t, therapistStatsArchive) => {
                     if (t.type !== 'expense' && t.status !== 'pending' && t.therapist) {
                         const branch = t.branch || 'Unknown';
@@ -1192,10 +1157,8 @@
                         if (therapistStatsArchive[branch]) {
                             const therapistData = therapistStatsArchive[branch].find(s => s.name === therapistName);
                             if (therapistData) {
-                                // Re-calculate based on (Amount - Transport)
                                 let baseAmount = Number(t.amount);
                                 if(t.transportFee) baseAmount -= Number(t.transportFee);
-                                
                                 return baseAmount * (therapistData.rate / 100);
                             }
                         }
@@ -1203,27 +1166,37 @@
                     return 0;
                 };
 
+                // FIX: Use short date to prevent Excel ####### error
+                let dateStr = record.date;
+                try {
+                    const d = new Date(record.date);
+                    if (!isNaN(d.getTime())) {
+                        dateStr = d.toLocaleDateString(); 
+                    }
+                } catch (e) {
+                    // Fallback to original string if parse fails
+                }
+
                 const rows = record.transactions.map(t => {
                     const commissionAmount = getCommissionForTransaction(t, record.therapist_stats || {});
 
                     return [
-                        `"${record.date}"`,  
+                        `"${dateStr}"`,  
                         `"${t.branch || 'N/A'}"`,  
                         `"${t.time}"`,  
-                        `"${t.clientName || t.description || ''}"`, // Use clientName or description
-                        `"${t.service || t.category || ''}"`, // Use service or category
+                        `"${t.clientName || t.description || ''}"`, 
+                        `"${t.service || t.category || ''}"`, 
                         `"${t.duration || ''}"`,  
                         `"${t.therapist || ''}"`,  
                         `"${t.location === 'home' ? 'Home Service' : 'In Spa'}"`,
                         t.transportFee || '0',
-                        t.amount, // Will be negative for expenses
-                        commissionAmount.toFixed(2), // NEW: Commission
+                        t.amount, 
+                        commissionAmount.toFixed(2), 
                         t.status,  
                         `"${t.recordedBy || 'System'}"`,
                         `"${t.notes || ''}"`
                     ];
                 });
-                // --- END MODIFICATION ---
                 
                 const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1236,7 +1209,6 @@
 
             // --- 4. ACTIONS ---
 
-            // List Management Handlers
             const handleAddItem = async (listType, itemName, extraData = null) => {
                 const trimmedItemName = itemName.trim();
                 if (!trimmedItemName) return;
@@ -1288,7 +1260,7 @@
                 setModal({
                     isOpen: true, type: 'confirm', title: `Delete ${listType}?`, message: `Are you sure you want to permanently delete "${name}"?`, confirmColor: 'red',
                     onConfirm: async () => {
-                        closeModal(); // Close confirm modal first
+                        closeModal(); 
                         setIsGlobalLoading(true);
                         try {
                             await fb.db.collection(`${basePath}/${collectionName}`).doc(id).delete();
@@ -1318,7 +1290,6 @@
                 }
                 else return;
 
-                // --- DUPLICATE CHECK LOGIC ---
                 if (updatedData.name) {
                     const newName = updatedData.name.trim().toLowerCase();
                     const isDuplicate = checkList.some(item =>  
@@ -1329,9 +1300,8 @@
                         setModal({ isOpen: true, type: 'alert', title: 'Duplicate Name', message: `The name "${updatedData.name}" is already in use by another ${listType}.`, onConfirm: closeModal, confirmColor: 'red' });
                         return;
                     }
-                    updatedData.name = newName.charAt(0).toUpperCase() + newName.slice(1); // Re-capitalize name before saving
+                    updatedData.name = newName.charAt(0).toUpperCase() + newName.slice(1); 
                 }
-                // --- END DUPLICATE CHECK ---
 
                 const basePath = `artifacts/${fb.appId}/public/data`;
                 setIsGlobalLoading(true);
@@ -1346,7 +1316,6 @@
                 }
             };
             
-            // History Deletion Handler (Admin Only)
             const handleDeleteHistory = (id, date) => {
                 if (user?.role !== 'admin') return;  
 
@@ -1392,7 +1361,6 @@
                         
                         const loggedUser = { ...found, currentBranch: loginBranch };
                         
-                        // UPDATE FIRESTORE WITH LOGIN BRANCH
                         const basePath = `artifacts/${fb.appId}/public/data`;
                         await fb.db.collection(`${basePath}/users`).doc(found.id).update({  
                             currentBranch: loginBranch,
@@ -1412,18 +1380,15 @@
                 }
             };
 
-            // HELPER: Calculate Price
             const calculatePrice = (serviceName, durationName, transport = 0) => {
                 let basePrice = 0;
                 
                 if (serviceName) {
                     const foundService = servicesList.find(s => s.name === serviceName);
                     if (foundService) {
-                        // 1. Try to find exact duration price
                         if (durationName && foundService.prices && foundService.prices[durationName]) {
                             basePrice = foundService.prices[durationName];
                         } 
-                        // 2. Fallback to base price
                         else if (foundService.price) {
                             basePrice = foundService.price;
                         }
@@ -1434,46 +1399,27 @@
             };
 
             const handleServiceChange = (serviceName) => {
-                // Calculate price based on this NEW service + EXISTING duration + EXISTING Transport
                 const newPrice = calculatePrice(serviceName, formData.duration, formData.transportFee);
-                
-                setFormData({  
-                    ...formData,  
-                    service: serviceName,
-                    amount: newPrice  
-                });
+                setFormData({ ...formData, service: serviceName, amount: newPrice });
             };
 
             const handleDurationChange = (durationName) => {
-                // Calculate price based on EXISTING service + NEW duration + EXISTING Transport
                 const newPrice = calculatePrice(formData.service, durationName, formData.transportFee);
-
-                setFormData({  
-                    ...formData,  
-                    duration: durationName,
-                    amount: newPrice  
-                });
+                setFormData({ ...formData, duration: durationName, amount: newPrice });
             };
             
             const handleTransportChange = (val) => {
                 const transport = parseFloat(val) || 0;
-                // Recalculate total with new transport
                 const newPrice = calculatePrice(formData.service, formData.duration, transport);
-                
-                setFormData({
-                    ...formData,
-                    transportFee: val,
-                    amount: newPrice
-                });
+                setFormData({ ...formData, transportFee: val, amount: newPrice });
             };
             
             const toggleLocation = (loc) => {
                 let newTransport = formData.transportFee;
                 if (loc === 'spa') {
-                    newTransport = ''; // Reset transport fee if back to Spa
+                    newTransport = ''; 
                 }
                 
-                // Recalculate based on change
                 const transportVal = loc === 'spa' ? 0 : (parseFloat(newTransport) || 0);
                 const newPrice = calculatePrice(formData.service, formData.duration, transportVal);
 
@@ -1485,7 +1431,6 @@
                 });
             };
 
-            // UPDATED: Unified submit handler for Booking/Sale/Expense
             const handleSubmit = async (e, typeOverride = null) => {
                 e.preventDefault();
                 const transactionType = typeOverride || formData.type;
@@ -1507,13 +1452,11 @@
                         return;
                     }
 
-                    // VALIDATION: Check for conflicts (Same Therapist at Exact Same Time on Same Day)
-                    // We only check conflicts against records in 'transactions' (Live + Future)
                     const allBookings = [...transactions, ...offlineQueue];
                     const isConflict = allBookings.some(t =>  
                         t.therapist === formData.therapist &&  
                         t.time === formData.time &&
-                        (t.bookingDate || formatDate(t.timestamp)) === formData.bookingDate && // Date Check
+                        (t.bookingDate || formatDate(t.timestamp)) === formData.bookingDate && 
                         t.type !== 'expense'
                     );
 
@@ -1525,11 +1468,9 @@
                 
                 let amountValue = parseFloat(formData.amount);
                 if (transactionType === 'expense') {
-                    // Expenses must be stored as negative numbers for easy calculation
                     amountValue = -Math.abs(amountValue);
                 }
 
-                // Payload
                 const transactionPayload = {
                     clientName: formData.clientName || formData.category, 
                     description: formData.notes, 
@@ -1541,7 +1482,7 @@
                     type: transactionType,
                     status: transactionType === 'expense' ? 'completed' : (transactionType === 'sale' ? 'completed' : 'pending'),
                     time: formData.time,
-                    bookingDate: formData.bookingDate, // Important new field
+                    bookingDate: formData.bookingDate, 
                     recordedBy: user.name,
                     branch: transactionBranch,
                     notes: formData.notes.trim(),
@@ -1549,12 +1490,11 @@
                     transportFee: formData.transportFee || 0
                 };
 
-                // OFFLINE HANDLING
                 if (!isOnline) {
                     const newOfflineItem = {
                         ...transactionPayload,
-                        localId: Date.now(), // Temp ID
-                        timestamp: Date.now() // Local timestamp
+                        localId: Date.now(), 
+                        timestamp: Date.now() 
                     };
                     setOfflineQueue(prev => [...prev, newOfflineItem]);
                     
@@ -1571,7 +1511,6 @@
                     return;
                 }
 
-                // ONLINE HANDLING
                 setIsGlobalLoading(true);
                 try {
                     const basePath = `artifacts/${fb.appId}/public/data`;
@@ -1592,7 +1531,6 @@
                     
                     setModal({ isOpen: true, type: 'alert', title: 'Record Saved!', message: `${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} saved for ${transactionBranch}.`, onConfirm: closeModal, confirmColor: 'logo-green' });
 
-                    // Set Dashboard date to the booking date so user sees it immediately
                     setDashboardDate(transactionPayload.bookingDate);
                     setView('dashboard');
                 } catch (error) {
@@ -1603,11 +1541,10 @@
             };
 
             const toggleStatus = async (t) => {
-                if (t.type === 'expense') return; // Cannot toggle expense status
+                if (t.type === 'expense') return; 
 
                 const basePath = `artifacts/${fb.appId}/public/data`;
                 const newStatus = t.status === 'pending' ? 'completed' : 'pending';
-                // Optimistic or silent update is usually fine here, but let's wrap for safety if requested
                 setIsGlobalLoading(true);
                 try {
                     await fb.db.collection(`${basePath}/transactions`).doc(t.id).update({ status: newStatus });
@@ -1641,7 +1578,6 @@
             };
 
             const requestEndDay = () => {
-                // Check if user has permission (Admin OR Staff) AND is not in 'ALL BRANCHES' view
                 if (user?.currentBranch === 'ALL' || (user?.role !== 'admin' && user?.role !== 'staff')) {  
                     setModal({ isOpen: true, type: 'alert', title: 'Access Denied', message: 'Only authorized Staff/Admin can close the shift/day on a specific branch view.', onConfirm: closeModal, confirmColor: 'red' });  
                     return;
@@ -1652,7 +1588,6 @@
                     return;
                 }
 
-                // Check if we are ending a future date (which is weird, but allowed if user wants to clear mistakes)
                 const isToday = dashboardDate === new Date().toISOString().split('T')[0];
                 const msg = isToday ? "Archive Today's Records?" : `Archive Records for ${dashboardDate}?`;
 
@@ -1669,9 +1604,8 @@
                             const historyColl = fb.db.collection(`${basePath}/history`);
                             const transColl = fb.db.collection(`${basePath}/transactions`);
 
-                            // 1. ATTEMPT TO ARCHIVE DATA (Only filteredTransactions i.e., current date view)
                             await historyColl.add({
-                                date: dashboardDate, // Use the specific date we are viewing
+                                date: dashboardDate, 
                                 date_formatted: new Date(dashboardDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
                                 timestamp: new Date().toLocaleString(),
                                 timestamp_val: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1683,23 +1617,18 @@
                             });
                             historySaveSuccess = true;
                             
-                            // 2. IF ARCHIVE SUCCESSFUL, ATTEMPT TO DELETE LIVE DATA
                             const deletePromises = filteredTransactions.map(t => transColl.doc(t.id).delete());
                             await Promise.all(deletePromises);
 
-                            // 3. COMPLETE SUCCESS
                             setView('dashboard');  
                             setModal({ isOpen: true, type: 'alert', title: 'Shift Closed!', message: `Shift transactions successfully archived.`, confirmColor: 'logo-green', onConfirm: closeModal });
 
                         } catch (error) {
                             console.error("End Day Fatal Error:", error);
-                            
-                            // 4. HANDLE FAILURE
                             let title = 'End Day Failed';
                             let message = 'An error occurred during the closing process. Your data has been preserved in the Live Records. Please check your connection or contact support.';
 
                             if (historySaveSuccess) {
-                                // If the history save succeeded but deletion failed:
                                 title = 'Cleanup Failed';
                                 message = 'The shift report was successfully saved to History, but clearing the dashboard failed. Live Records may contain entries that need manual deletion (Admin only).';
                             }
@@ -1713,7 +1642,6 @@
                 });
             };
 
-            // User & Profile Handlers
             const handleAddUser = async (e) => {
                 e.preventDefault();
                 const trimmedUsername = newUser.username.trim();
@@ -1729,7 +1657,6 @@
                         return;
                     }
                     
-                    // Policy check for new user creation
                     const requiredLen = newUser.role === 'admin' ? 6 : 4;
                     if (newUser.pin.length !== requiredLen) {  
                         setModal({ isOpen: true, type: 'alert', title: 'Policy Check', message: `${newUser.role.toUpperCase()} PINs must be exactly ${requiredLen} digits.`, onConfirm: closeModal, confirmColor: 'red' });  
@@ -1749,13 +1676,11 @@
                         pin: hashedPin  
                     };
                     
-                    // SMART ADD: Auto-tag with creator's branch
                     if (user.currentBranch !== 'ALL') {
                         newUserPayload.currentBranch = user.currentBranch;
                     }
 
                     await fb.db.collection(`${basePath}/users`).add(newUserPayload);
-                    // UPDATED: Reset role to 'staff'
                     setNewUser({ name: '', username: '', pin: '', role: 'staff' });  
                 } catch(err) {
                     setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'Failed to add user.', confirmColor: 'red', onConfirm: closeModal });
@@ -1783,9 +1708,7 @@
                 }});
             };
 
-            // NEW: Owner Toggle Role Function
             const handleToggleRole = (targetUser) => {
-                // Toggle between admin and staff
                 const newRole = targetUser.role === 'admin' ? 'staff' : 'admin';  
                 const action = newRole === 'admin' ? 'Promote to Admin' : 'Demote to Staff';  
                 
@@ -1820,7 +1743,6 @@
                 setIsGlobalLoading(true);
                 try {
                     if (newPin && newPin.length > 0) {
-                        // MODIFIED: Policy Check based on role for 4 or 6 digits
                         const requiredLen = user.role === 'admin' ? 6 : 4;  
                         
                         if (newPin.length !== requiredLen) {
@@ -1846,7 +1768,7 @@
                     
                     const updatedUser = { ...user, ...updateData };
                     setUser(updatedUser);
-                    localStorage.setItem('spa_user', JSON.stringify(updatedUser)); // NEW: Update local storage too
+                    localStorage.setItem('spa_user', JSON.stringify(updatedUser)); 
                     setModal({ isOpen: true, type: 'alert', title: 'Updated', message: 'Credentials synced.', onConfirm: closeModal, confirmColor: 'logo-green' });
                 } catch (err) {
                     setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'Failed to update profile.', confirmColor: 'red', onConfirm: closeModal });
@@ -1860,7 +1782,6 @@
                 const targetUser = editUserModal.user;
                 const newPin = editUserModal.newPin;
 
-                // MODIFIED: Check length based on target user's role
                 const requiredLen = targetUser.role === 'admin' ? 6 : 4;
 
                 if (newPin.length !== requiredLen) {
@@ -1879,7 +1800,6 @@
                     const basePath = `artifacts/${fb.appId}/public/data`;
                     await fb.db.collection(`${basePath}/users`).doc(targetUser.id).update({ pin: hashedPin });
                     
-                    // Close modal and show success
                     setEditUserModal({ isOpen: false, user: null, newPin: '' });
                     setModal({ isOpen: true, type: 'alert', title: 'Success', message: `${targetUser.name}'s PIN has been reset.`, onConfirm: closeModal, confirmColor: 'logo-green' });
                 } catch (error) {
@@ -2019,10 +1939,10 @@
                                             onChange={(e) => setDashboardDate(e.target.value)} 
                                             className="font-bold text-lg text-slate-700 bg-transparent text-center focus:outline-none cursor-pointer"
                                         />
-                                        {dashboardDate > new Date().toISOString().split('T')[0] && (
+                                        {dashboardDate > getTodayStr() && (
                                             <span className="block text-[10px] text-blue-500 font-bold bg-blue-50 rounded-full px-2 py-0.5 mt-1">FUTURE BOOKINGS</span>
                                         )}
-                                        {dashboardDate === new Date().toISOString().split('T')[0] && (
+                                        {dashboardDate === getTodayStr() && (
                                             <span className="block text-[10px] text-green-500 font-bold bg-green-50 rounded-full px-2 py-0.5 mt-1">LIVE / TODAY</span>
                                         )}
                                     </div>
@@ -2048,6 +1968,7 @@
                                                     <tr>
                                                         <th className="px-2 py-2">Branch</th>
                                                         <th className="px-2 py-2 text-right">Net Cash</th>
+                                                        <th className="px-2 py-2 text-right text-red-600">Expenses</th>
                                                         <th className="px-2 py-2 text-right">Trans.</th>
                                                     </tr>
                                                 </thead>
@@ -2056,12 +1977,14 @@
                                                         <tr key={b.branch} className="border-b hover:bg-teal-50/50 transition">
                                                             <td className="px-2 py-2 font-semibold text-slate-700">{b.branch}</td>
                                                             <td className={`px-2 py-2 text-right font-bold ${b.netCash < 0 ? 'text-red-600' : 'text-logo-green-700'}`}>{formatCurrency(b.netCash)}</td>
+                                                            <td className="px-2 py-2 text-right text-red-500">{formatCurrency(b.totalExpenses)}</td>
                                                             <td className="px-2 py-2 text-right text-slate-500">{b.count}</td>
                                                         </tr>
                                                     ))}
                                                     <tr className="bg-logo-green-100 font-extrabold text-sm text-logo-green-900 border-t-2 border-logo-green-700">
                                                         <td className="px-2 py-2">GRAND TOTAL</td>
                                                         <td className={`px-2 py-2 text-right ${stats.netCash < 0 ? 'text-red-600 font-bold' : ''}`}>{formatCurrency(stats.netCash)}</td>
+                                                        <td className="px-2 py-2 text-right text-red-600">{formatCurrency(stats.totalExpenses)}</td>
                                                         <td className="px-2 py-2 text-right">{transactions.length}</td>
                                                     </tr>
                                                 </tbody>
@@ -2127,7 +2050,7 @@
                                     <div className="flex justify-between items-center mb-4">
                                         <h2 className="text-lg font-bold text-logo-green-900 flex gap-2 items-center">
                                             <Icons.LayoutDashboard size={18}/> 
-                                            {dashboardDate === new Date().toISOString().split('T')[0] ? "Live Records" : "Future Bookings"} 
+                                            {dashboardDate === getTodayStr() ? "Live Records" : "Future Bookings"} 
                                             <span className="text-xs font-normal text-slate-500 ml-2">({showMyShift ? 'My Shift' : user.currentBranch})</span>
                                         </h2>
                                         <div className="flex items-center gap-2">
