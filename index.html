@@ -80,7 +80,7 @@
             'AS Fortuna'
         ];
         
-        // --- FIREBASE CONFIGURATION (Reverted to Hardcoded) ---
+        // --- FIREBASE CONFIGURATION ---
         const MANUAL_FIREBASE_CONFIG = {
             apiKey: "AIzaSyAKXcZwKtFBRFvGbOKd0UnQrLuOLt7wV9M",
             authDomain: "ahmas-tracker.firebaseapp.com",
@@ -154,7 +154,12 @@
             ClipboardList: (p) => <Icon name="clipboard-list" {...p} />,
             MinusCircle: (p) => <Icon name="minus-circle" {...p} />,
             Wallet: (p) => <Icon name="wallet" {...p} />,
-            TrendingUp: (p) => <Icon name="trending-up" {...p} />  
+            TrendingUp: (p) => <Icon name="trending-up" {...p} />,
+            SteeringWheel: (p) => <Icon name="joystick" {...p} />, // Using joystick as proxy for steering wheel or car front
+            DoorOpen: (p) => <Icon name="door-open" {...p} />, // ADDED: Icon for Rooms
+            CreditCard: (p) => <Icon name="credit-card" {...p} />, // ADDED: Card
+            Smartphone: (p) => <Icon name="smartphone" {...p} />, // ADDED: GCash/Phone
+            Banknote: (p) => <Icon name="banknote" {...p} /> // ADDED: Cash
         };
 
         // --- SECURITY HELPER: Hashing Function ---
@@ -182,8 +187,7 @@
             return 0;
         };
 
-        // --- IMPROVEMENT: TIMEZONE SAFE DATE HELPER ---
-        // Returns YYYY-MM-DD based on Local Browser Time
+        // --- DATE HELPER ---
         const getTodayStr = () => {
             const now = new Date();
             const year = now.getFullYear();
@@ -204,7 +208,8 @@
 
 
         // --- List Management Component (Admin Only) ---
-        const ListManagement = ({ therapists, services, durations, onAdd, onDelete, onEdit }) => {
+        // ADDED: rooms prop and logic
+        const ListManagement = ({ therapists, services, durations, drivers, rooms, onAdd, onDelete, onEdit }) => {
             const [activeTab, setActiveTab] = useState('therapist');  
             
             // Add State
@@ -289,10 +294,18 @@
                 currentList = services;
                 placeholderText = "Enter Service Name (e.g. Swedish)";
                 icon = <Icons.Tag size={18} />;
-            } else {
+            } else if (activeTab === 'duration') {
                 currentList = durations;
                 placeholderText = "Enter Duration (e.g. 60 Mins)";
                 icon = <Icons.Hourglass size={18} />;
+            } else if (activeTab === 'driver') {
+                currentList = drivers;
+                placeholderText = "Enter Driver Name";
+                icon = <Icons.Car size={18} />;
+            } else if (activeTab === 'room') { // ADDED
+                currentList = rooms;
+                placeholderText = "Enter Room Name/Number";
+                icon = <Icons.DoorOpen size={18} />;
             }
 
             return (
@@ -300,14 +313,20 @@
                     <h2 className="text-lg font-bold text-logo-green-800 flex gap-2 items-center"><Icons.ShieldCheck size={18} className="text-logo-green-700"/> Master Data Lists</h2>
                     
                     {/* Tabs */}
-                    <div className="flex bg-slate-100 p-1 rounded-lg">
-                        <button onClick={() => setActiveTab('therapist')} className={`flex-1 py-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 ${activeTab==='therapist' ? 'bg-white shadow-sm text-logo-green-700' : 'text-slate-500'}`}>
+                    <div className="flex bg-slate-100 p-1 rounded-lg overflow-x-auto">
+                        <button onClick={() => setActiveTab('therapist')} className={`flex-1 py-2 px-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 min-w-[90px] ${activeTab==='therapist' ? 'bg-white shadow-sm text-logo-green-700' : 'text-slate-500'}`}>
                             <Icons.Users size={14}/> Therapists
                         </button>
-                        <button onClick={() => setActiveTab('duration')} className={`flex-1 py-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 ${activeTab==='duration' ? 'bg-white shadow-sm text-logo-green-700' : 'text-slate-500'}`}>
+                        <button onClick={() => setActiveTab('room')} className={`flex-1 py-2 px-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 min-w-[80px] ${activeTab==='room' ? 'bg-white shadow-sm text-logo-green-700' : 'text-slate-500'}`}>
+                            <Icons.DoorOpen size={14}/> Rooms
+                        </button>
+                        <button onClick={() => setActiveTab('driver')} className={`flex-1 py-2 px-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 min-w-[80px] ${activeTab==='driver' ? 'bg-white shadow-sm text-logo-green-700' : 'text-slate-500'}`}>
+                            <Icons.Car size={14}/> Drivers
+                        </button>
+                        <button onClick={() => setActiveTab('duration')} className={`flex-1 py-2 px-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 min-w-[80px] ${activeTab==='duration' ? 'bg-white shadow-sm text-logo-green-700' : 'text-slate-500'}`}>
                             <Icons.Clock size={14}/> Minutes
                         </button>
-                        <button onClick={() => setActiveTab('service')} className={`flex-1 py-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 ${activeTab==='service' ? 'bg-white shadow-sm text-logo-green-700' : 'text-slate-500'}`}>
+                        <button onClick={() => setActiveTab('service')} className={`flex-1 py-2 px-2 text-xs font-bold rounded-md flex items-center justify-center gap-1 min-w-[80px] ${activeTab==='service' ? 'bg-white shadow-sm text-logo-green-700' : 'text-slate-500'}`}>
                             <Icons.Sparkles size={14}/> Services
                         </button>
                     </div>
@@ -382,7 +401,7 @@
                     {/* Current List */}
                     <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
                         <div className="p-4 bg-logo-green-50 font-bold text-logo-green-800 text-sm border-b border-logo-green-100 flex justify-between items-center">
-                            <span>Current {activeTab === 'duration' ? 'Durations' : activeTab + 's'} ({currentList.length})</span>
+                            <span>Current {activeTab === 'duration' ? 'Durations' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1) + 's'} ({currentList.length})</span>
                             {icon}
                         </div>
                         
@@ -392,102 +411,102 @@
                             ) : (
                                 currentList.map(item => (
                                     <div key={item.id} className="p-4 border-b flex flex-col gap-2 last:border-b-0 hover:bg-slate-50">
-                                        <div className="flex justify-between items-center w-full">
-                                            {editingId === item.id ? (
-                                                <input 
-                                                    value={editName}
-                                                    onChange={e => setEditName(e.target.value)}
-                                                    className="flex-1 p-2 border rounded text-sm bg-white focus:ring-2 focus:ring-logo-green-500 mr-2"
-                                                />
-                                            ) : (
-                                                <span className="text-slate-700 font-medium">{item.name}</span>
+                                            <div className="flex justify-between items-center w-full">
+                                                {editingId === item.id ? (
+                                                    <input 
+                                                        value={editName}
+                                                        onChange={e => setEditName(e.target.value)}
+                                                        className="flex-1 p-2 border rounded text-sm bg-white focus:ring-2 focus:ring-logo-green-500 mr-2"
+                                                    />
+                                                ) : (
+                                                    <span className="text-slate-700 font-medium">{item.name}</span>
+                                                )}
+                                                
+                                                <div className="flex gap-1">
+                                                    {editingId === item.id ? (
+                                                        <>
+                                                            <button onClick={saveEdit} className="text-logo-green-600 hover:bg-logo-green-50 p-2 rounded transition"><Icons.CheckCircle2 size={18}/></button>
+                                                            <button onClick={cancelEdit} className="text-slate-400 hover:bg-slate-100 p-2 rounded transition"><Icons.X size={18}/></button>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <button onClick={() => startEdit(item)} className="text-slate-300 hover:text-blue-500 p-2 rounded hover:bg-blue-50 transition" title="Edit Item">
+                                                                <Icons.Pencil size={16} />
+                                                            </button>
+                                                            <button type="button" onClick={() => onDelete(activeTab, item.id, item.name)} className="text-slate-300 hover:text-red-500 p-2 rounded hover:bg-red-50 transition" title="Delete Item">
+                                                                <Icons.Trash2 size={16}/>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Service Pricing Details */}
+                                            {activeTab === 'service' && (
+                                                <div className="text-xs text-slate-500 w-full">
+                                                    {editingId === item.id ? (
+                                                        <div className="grid grid-cols-2 gap-2 mt-2 bg-slate-100 p-2 rounded">
+                                                            {durations.map(d => (
+                                                                <div key={d.id} className="flex items-center gap-2">
+                                                                    <span className="font-bold w-14">{d.name}:</span>
+                                                                    <input  
+                                                                        type="number"  
+                                                                        className="w-full p-1 border rounded text-xs"
+                                                                        placeholder="0"
+                                                                        value={editPrices[d.name] || ''}
+                                                                        onChange={e => handlePriceChange(d.name, e.target.value, true)}
+                                                                    />
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-wrap gap-2 mt-1">
+                                                            {item.prices && Object.keys(item.prices).length > 0 ? (
+                                                                Object.entries(item.prices).map(([dur, price]) => (
+                                                                    <span key={dur} className="bg-logo-green-50 text-logo-green-700 px-2 py-0.5 rounded border border-logo-green-100">
+                                                                        {dur}: <span className="font-bold">P{price}</span>
+                                                                    </span>
+                                                                ))
+                                                            ) : (
+                                                                <span className="italic text-slate-300">No specific prices set</span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
                                             )}
                                             
-                                            <div className="flex gap-1">
-                                                {editingId === item.id ? (
-                                                    <>
-                                                        <button onClick={saveEdit} className="text-logo-green-600 hover:bg-logo-green-50 p-2 rounded transition"><Icons.CheckCircle2 size={18}/></button>
-                                                        <button onClick={cancelEdit} className="text-slate-400 hover:bg-slate-100 p-2 rounded transition"><Icons.X size={18}/></button>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <button onClick={() => startEdit(item)} className="text-slate-300 hover:text-blue-500 p-2 rounded hover:bg-blue-50 transition" title="Edit Item">
-                                                            <Icons.Pencil size={16} />
-                                                        </button>
-                                                        <button type="button" onClick={() => onDelete(activeTab, item.id, item.name)} className="text-slate-300 hover:text-red-500 p-2 rounded hover:bg-red-50 transition" title="Delete Item">
-                                                            <Icons.Trash2 size={16}/>
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Service Pricing Details */}
-                                        {activeTab === 'service' && (
-                                            <div className="text-xs text-slate-500 w-full">
-                                                {editingId === item.id ? (
-                                                    <div className="grid grid-cols-2 gap-2 mt-2 bg-slate-100 p-2 rounded">
-                                                        {durations.map(d => (
-                                                            <div key={d.id} className="flex items-center gap-2">
-                                                                <span className="font-bold w-14">{d.name}:</span>
-                                                                <input  
-                                                                    type="number"  
-                                                                    className="w-full p-1 border rounded text-xs"
-                                                                    placeholder="0"
-                                                                    value={editPrices[d.name] || ''}
-                                                                    onChange={e => handlePriceChange(d.name, e.target.value, true)}
-                                                                />
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-wrap gap-2 mt-1">
-                                                        {item.prices && Object.keys(item.prices).length > 0 ? (
-                                                            Object.entries(item.prices).map(([dur, price]) => (
-                                                                <span key={dur} className="bg-logo-green-50 text-logo-green-700 px-2 py-0.5 rounded border border-logo-green-100">
-                                                                    {dur}: <span className="font-bold">P{price}</span>
+                                            {/* Therapist Commission Details */}
+                                            {activeTab === 'therapist' && (
+                                                <div className="text-xs text-slate-500 w-full">
+                                                    {editingId === item.id ? (
+                                                        <div className="mt-2 bg-slate-100 p-2 rounded flex items-center gap-2">
+                                                            <span className="font-bold w-20">Rate (%):</span>
+                                                            <input  
+                                                                type="number"  
+                                                                min="0"
+                                                                max="100"
+                                                                step="0.1"
+                                                                className="w-full p-1 border rounded text-xs"
+                                                                placeholder="0"
+                                                                value={editCommission}
+                                                                onChange={e => setEditCommission(e.target.value)}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex flex-wrap gap-2 mt-1">
+                                                                <span className="bg-teal-50 text-teal-700 px-2 py-0.5 rounded border border-teal-100 font-bold">
+                                                                    Commission: {item.commissionRate !== undefined ? `${item.commissionRate}%` : 'N/A'}
                                                                 </span>
-                                                            ))
-                                                        ) : (
-                                                            <span className="italic text-slate-300">No specific prices set</span>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                        
-                                        {/* Therapist Commission Details */}
-                                        {activeTab === 'therapist' && (
-                                            <div className="text-xs text-slate-500 w-full">
-                                                {editingId === item.id ? (
-                                                    <div className="mt-2 bg-slate-100 p-2 rounded flex items-center gap-2">
-                                                        <span className="font-bold w-20">Rate (%):</span>
-                                                        <input  
-                                                            type="number"  
-                                                            min="0"
-                                                            max="100"
-                                                            step="0.1"
-                                                            className="w-full p-1 border rounded text-xs"
-                                                            placeholder="0"
-                                                            value={editCommission}
-                                                            onChange={e => setEditCommission(e.target.value)}
-                                                        />
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex flex-wrap gap-2 mt-1">
-                                                        <span className="bg-teal-50 text-teal-700 px-2 py-0.5 rounded border border-teal-100 font-bold">
-                                                            Commission: {item.commissionRate !== undefined ? `${item.commissionRate}%` : 'N/A'}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
                                     </div>
                                 ))
                             )}
                         </div>
                     </div>
-                     {modal.isOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60"><div className="bg-white rounded-xl p-6 max-w-sm"><h3 className="font-bold mb-2">{modal.title}</h3><p className="mb-4 text-sm">{modal.message}</p><div className="flex gap-2 justify-end">{modal.type==='confirm'&&<button onClick={closeModal} className="px-4 py-2 text-slate-500">Cancel</button>}<button onClick={modal.onConfirm||closeModal} className={`px-4 py-2 rounded text-white ${modal.confirmColor==='red'?'bg-red-500':'bg-logo-green-600'}`}>Okay</button></div></div></div>}
+                      {modal.isOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60"><div className="bg-white rounded-xl p-6 max-w-sm"><h3 className="font-bold mb-2">{modal.title}</h3><p className="mb-4 text-sm">{modal.message}</p><div className="flex gap-2 justify-end">{modal.type==='confirm'&&<button onClick={closeModal} className="px-4 py-2 text-slate-500">Cancel</button>}<button onClick={modal.onConfirm||closeModal} className={`px-4 py-2 rounded text-white ${modal.confirmColor==='red'?'bg-red-500':'bg-logo-green-600'}`}>Okay</button></div></div></div>}
                 </div>
             );
         };
@@ -565,19 +584,20 @@
             const [transactions, setTransactions] = useState([]);
             const [history, setHistory] = useState([]);
             
-            // IMPROVEMENT: Initialize Date using Robust Helper to avoid timezone drift
             const [dashboardDate, setDashboardDate] = useState(getTodayStr());
 
-            // NEW: Offline Queue State
+            // Offline Queue State
             const [offlineQueue, setOfflineQueue] = useState([]);
             
-            // NEW: Real-time Listener Control State
+            // Real-time Listener Control State
             const [isTransactionListenerActive, setIsTransactionListenerActive] = useState(true);
 
             // Master Lists
             const [therapistsList, setTherapistsList] = useState([]);
             const [servicesList, setServicesList] = useState([]);
             const [durationsList, setDurationsList] = useState([]);
+            const [driversList, setDriversList] = useState([]); 
+            const [roomsList, setRoomsList] = useState([]); // ADDED: Room List State
             
             const [view, setView] = useState('dashboard');
             const [expandedHistoryId, setExpandedHistoryId] = useState(null);
@@ -594,13 +614,13 @@
             const [loginPin, setLoginPin] = useState('');
             const [loginBranch, setLoginBranch] = useState('');  
             
-            // Initial role is 'staff'
             const [newUser, setNewUser] = useState({ name: '', username: '', pin: '', role: 'staff' });
             const [profileData, setProfileData] = useState({ username: '', pin: '' });
             
             // Added expense-related fields and viewType
             const [formData, setFormData] = useState({
                 clientName: '',  
+                clientContact: '', 
                 service: '',  
                 therapist: '',  
                 amount: '',  
@@ -610,9 +630,12 @@
                 targetBranch: '',
                 notes: '',
                 category: '', 
-                bookingDate: getTodayStr(), // Robust default
+                bookingDate: getTodayStr(), 
                 location: 'spa', 
-                transportFee: '' 
+                transportFee: '',
+                driver: '',
+                room: '',
+                paymentMethod: 'Cash' // ADDED: Default to Cash
             });
             const [modal, setModal] = useState({
                 isOpen: false, type: 'confirm', title: '', message: '', onConfirm: null, confirmColor: 'red'
@@ -623,6 +646,13 @@
             const closeModal = () => setModal({ ...modal, isOpen: false });
             const closeEditUserModal = () => setEditUserModal({ isOpen: false, user: null, newPin: '' });
             
+            // NEW: Multi-therapist state
+            const [selectedTherapists, setSelectedTherapists] = useState([]);
+            // NEW: Multi-driver state
+            const [selectedDrivers, setSelectedDrivers] = useState([]);
+            // NEW: Track details per therapist (Service/Price)
+            const [therapistRows, setTherapistRows] = useState({});
+
             // --- Activity Timer for Throttling ---
             const activityTimerRef = useRef(null);
             const INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 minutes
@@ -650,7 +680,7 @@
 
                 const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
                 events.forEach(event => window.addEventListener(event, resetActivityTimer));
-                resetActivityTimer(); // Start timer on component mount/view change
+                resetActivityTimer(); 
 
                 return () => {
                     if (activityTimerRef.current) {
@@ -661,9 +691,9 @@
             }, [user, view]);
 
 
-            // --- 1. INITIALIZE FIREBASE & AUTH (Reverted) ---
+            // --- 1. INITIALIZE FIREBASE & AUTH ---
             useEffect(() => {
-                // Load offline queue from local storage
+                // Load offline queue
                 const savedQueue = localStorage.getItem('spa_offline_queue');
                 if (savedQueue) {
                     try {
@@ -673,13 +703,12 @@
                     }
                 }
 
-                // Restore session from Local Storage
+                // Restore session
                 const savedUser = localStorage.getItem('spa_user');
                 if (savedUser) {
                     try {
                         setUser(JSON.parse(savedUser));
                     } catch (e) {
-                        console.error("Failed to parse saved user", e);
                         localStorage.removeItem('spa_user');
                     }
                 }
@@ -698,7 +727,6 @@
                         const auth = firebase.auth();
                         const db = firebase.firestore();
 
-                        // Reverted to original anonymous sign-in logic
                         await auth.signInAnonymously();
 
                         auth.onAuthStateChanged((u) => {
@@ -709,16 +737,7 @@
                         });
                     } catch (error) {  
                         console.error("FB Init Error:", error);  
-                        
-                        let msg = error.message || "Unknown connection error";
-                        
-                        if (error.code === 'auth/operation-not-allowed') {
-                            msg = "Anonymous Authentication is DISABLED. Please enable it in Firebase Console.";
-                        } else if (error.code === 'auth/unauthorized-domain') {
-                            msg = "Domain not authorized. Please add your domain to Firebase settings.";
-                        }
-
-                        setConfigError(msg);  
+                        setConfigError(error.message);  
                     }
                 };
 
@@ -748,19 +767,16 @@
                         setIsGlobalLoading(true);
                         try {
                             for (const item of queueCopy) {
-                                // IMPORTANT: Restore serverTimestamp behavior
                                 const itemPayload = {
                                     ...item,
                                     timestamp: firebase.firestore.FieldValue.serverTimestamp()  
                                 };
-                                // Remove local id used for keying
                                 delete itemPayload.localId;
 
                                 await fb.db.collection(`${basePath}/transactions`).add(itemPayload);
                                 syncedCount++;
                             }
                             
-                            // Clear queue only after success
                             setOfflineQueue([]);
                             setModal({ isOpen: true, type: 'alert', title: 'Sync Complete', message: `Successfully uploaded ${syncedCount} offline records.`, confirmColor: 'logo-green', onConfirm: closeModal });
 
@@ -777,7 +793,6 @@
 
 
             // --- 2. DATA SYNC (Listener Management) ---
-            
             useEffect(() => {
                 if (!fb || !fbUser) return;
                 const { db, appId } = fb;
@@ -787,23 +802,14 @@
                 
                 let unsubTrans = () => {};
                 if (isTransactionListenerActive && view === 'dashboard') {
-                    // IMPROVEMENT: SCALABILITY - Server Side Filtering
-                    // Instead of loading all data, we only load data for the selected dashboardDate.
-                    
                     let query = getCollection('transactions');
-                    
                     if (dashboardDate) {
                         query = query.where('bookingDate', '==', dashboardDate);
                     }
 
                     unsubTrans = query.onSnapshot((snapshot) => {
                             const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            
-                            // Client-side sort
-                            data.sort((a, b) => {
-                                return getMillis(b.timestamp) - getMillis(a.timestamp);
-                            });
-                            
+                            data.sort((a, b) => getMillis(b.timestamp) - getMillis(a.timestamp));
                             setTransactions(data);
                             setDbReady(true);
                         }, (error) => console.error("Sync Error: Transactions", error));
@@ -811,60 +817,67 @@
                     setIsTransactionListenerActive(false);
                 }
 
-                // Users (Always Load)
+                // Users
                 const unsubUsers = getCollection('users')
                     .onSnapshot(async (snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        const userColl = getCollection('users');
-                        
                         if (data.length === 0) {
                             seedDefaultUsers(db, basePath);
                             return;  
                         }
-
-                        const needsUpdate = data.filter(u => (u.username === 'admin' && u.pin.length < 20) || (u.username === 'morning' && u.pin.length < 20) || (u.username === 'night' && u.pin.length < 20));
-                        let shouldWait = false;
+                        // Simple pin migration logic (kept from original)
+                        const needsUpdate = data.filter(u => (u.username === 'admin' && u.pin.length < 20));
                         for (const u of needsUpdate) {
-                            if (u.pin === '8888' || u.pin === '888888') { 
+                             if (u.pin === '8888' || u.pin === '888888') { 
                                 const hashedPin = await hashPin('888888'); 
-                                await userColl.doc(u.id).update({ pin: hashedPin, role: 'admin' });  
-                                shouldWait = true;
-                            } else if (u.pin === '1111' || u.pin === '2222') { 
-                                const hashedPin = await hashPin(u.pin.length === 4 ? u.pin : '1111'); 
-                                await userColl.doc(u.id).update({ pin: hashedPin, role: 'staff' });  
-                                shouldWait = true;
-                            }
+                                await getCollection('users').doc(u.id).update({ pin: hashedPin, role: 'admin' });  
+                             }
                         }
-                        
-                        if (!shouldWait) {
-                            setUsers(data);
-                        }
-
+                        setUsers(data);
                     }, (error) => console.error("Sync Error: Users", error));
 
-                // Master Lists (Always Load)
+                // Master Lists
                 const unsubTherapists = getCollection('therapists')
                     .onSnapshot((snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setTherapistsList(data.sort((a, b) => a.name.localeCompare(b.name)));
-                    }, (error) => console.error("Sync Error: Therapists", error));
+                    });
 
                 const unsubServices = getCollection('services')
                     .onSnapshot((snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                         setServicesList(data.sort((a, b) => a.name.localeCompare(b.name)));
-                    }, (error) => console.error("Sync Error: Services", error));
+                    });
 
                 const unsubDurations = getCollection('durations')
                     .onSnapshot((snapshot) => {
                         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                        
                         setDurationsList(data.sort((a, b) => {
                             const valA = parseInt(a.name) || 0;
                             const valB = parseInt(b.name) || 0;
                             return valA - valB;
                         }));
-                    }, (error) => console.error("Sync Error: Durations", error));
+                    });
+
+                // ADDED: Drivers Listener
+                const unsubDrivers = getCollection('drivers')
+                    .onSnapshot((snapshot) => {
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        setDriversList(data.sort((a, b) => a.name.localeCompare(b.name)));
+                    }, (error) => console.error("Sync Error: Drivers", error));
+
+                // ADDED: Rooms Listener
+                const unsubRooms = getCollection('rooms')
+                    .onSnapshot((snapshot) => {
+                        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        // Sort numerically if names are numbers, otherwise alphabetically
+                        setRoomsList(data.sort((a, b) => {
+                            const valA = parseInt(a.name);
+                            const valB = parseInt(b.name);
+                            if (!isNaN(valA) && !isNaN(valB)) return valA - valB;
+                            return a.name.localeCompare(b.name);
+                        }));
+                    }, (error) => console.error("Sync Error: Rooms", error));
 
 
                 return () => {  
@@ -873,22 +886,21 @@
                     unsubTherapists();  
                     unsubServices();
                     unsubDurations();
+                    unsubDrivers();
+                    unsubRooms(); // Cleanup rooms
                 };
             }, [fb, fbUser, isTransactionListenerActive, view, dashboardDate]); 
 
 
-            // --- 2b. LAZY LOAD HISTORY (Only when View is 'history') ---
+            // --- 2b. LAZY LOAD HISTORY ---
             useEffect(() => {
                 if (!fb || !fbUser || view !== 'history') {
-                    if (history.length > 0) setHistory([]); // Free up memory
+                    if (history.length > 0) setHistory([]); 
                     return;
                 }
                 
                 const { db, appId } = fb;
                 const basePath = `artifacts/${appId}/public/data`;
-                
-                // IMPROVEMENT: SCALABILITY for History
-                // Limit to last 50 reports by default
                 let query = db.collection(`${basePath}/history`).orderBy('timestamp_val', 'desc');
                 
                 const unsub = query.limit(50)
@@ -917,7 +929,7 @@
                 }
             }, [users, user]);
             
-            // --- 2d. PRESENCE SYSTEM (HEARTBEAT) ---
+            // --- 2d. PRESENCE SYSTEM ---
             useEffect(() => {
                 if (!user || !fb) return;
                 
@@ -935,11 +947,10 @@
                 return () => clearInterval(interval);
             }, [user, fb]);
 
-            // Helper: Check if a user is online
             const isUserOnline = (lastActive) => {
                 if (!lastActive) return false;
                 const diff = Date.now() - getMillis(lastActive);
-                return diff < 2 * 60 * 1000; // 2 minutes threshold
+                return diff < 2 * 60 * 1000;
             };
 
 
@@ -999,12 +1010,9 @@
                     data = data.filter(t => t.recordedBy === user.name);
                 }
                 
-                // Filter by Dashboard Date is handled server-side now, 
-                // but we keep client side check for robustness (e.g. offline queue items)
                 if (view === 'dashboard') {
                     data = data.filter(t => {
                         const recordDate = t.bookingDate || formatDate(t.timestamp); 
-                        
                         let recordDateStr = '';
                         if (t.bookingDate) {
                             recordDateStr = t.bookingDate; 
@@ -1012,7 +1020,6 @@
                             const d = new Date(getMillis(t.timestamp));
                             recordDateStr = d.toISOString().split('T')[0];
                         }
-                        
                         return recordDateStr === dashboardDate;
                     });
                 }
@@ -1147,7 +1154,11 @@
             }, [history, historyStartDate, historyEndDate, user]);
 
             const downloadCSV = (record) => {
-                const headers = ['Date', 'Branch', 'Time', 'Client Name / Description', 'Service / Category', 'Duration', 'Therapist', 'Location', 'Transport Fee', 'Total Amount', 'Commission Amount', 'Status', 'Recorded By', 'Notes'];  
+                // ADDED: Driver column to header
+                // ADDED: Client Contact column
+                // ADDED: Room column
+                // ADDED: Payment Method column
+                const headers = ['Date', 'Branch', 'Time', 'Client Name', 'Client Contact', 'Description', 'Service / Category', 'Duration', 'Therapist', 'Driver', 'Location', 'Room', 'Payment Method', 'Transport Fee', 'Total Amount', 'Commission Amount', 'Status', 'Recorded By', 'Notes'];  
                 
                 const getCommissionForTransaction = (t, therapistStatsArchive) => {
                     if (t.type !== 'expense' && t.status !== 'pending' && t.therapist) {
@@ -1158,6 +1169,7 @@
                             const therapistData = therapistStatsArchive[branch].find(s => s.name === therapistName);
                             if (therapistData) {
                                 let baseAmount = Number(t.amount);
+                                // Transport fee is already split in the DB record, but we subtract it just to be safe if logic matches
                                 if(t.transportFee) baseAmount -= Number(t.transportFee);
                                 return baseAmount * (therapistData.rate / 100);
                             }
@@ -1166,16 +1178,13 @@
                     return 0;
                 };
 
-                // FIX: Use short date to prevent Excel ####### error
                 let dateStr = record.date;
                 try {
                     const d = new Date(record.date);
                     if (!isNaN(d.getTime())) {
                         dateStr = d.toLocaleDateString(); 
                     }
-                } catch (e) {
-                    // Fallback to original string if parse fails
-                }
+                } catch (e) {}
 
                 const rows = record.transactions.map(t => {
                     const commissionAmount = getCommissionForTransaction(t, record.therapist_stats || {});
@@ -1184,11 +1193,16 @@
                         `"${dateStr}"`,  
                         `"${t.branch || 'N/A'}"`,  
                         `"${t.time}"`,  
-                        `"${t.clientName || t.description || ''}"`, 
+                        `"${t.clientName || ''}"`, // Client Name
+                        `"${t.clientContact || ''}"`, // ADDED: Client Contact
+                        `"${t.description || ''}"`, 
                         `"${t.service || t.category || ''}"`, 
                         `"${t.duration || ''}"`,  
-                        `"${t.therapist || ''}"`,  
+                        `"${t.therapist || ''}"`, 
+                        `"${t.driver || ''}"`, 
                         `"${t.location === 'home' ? 'Home Service' : 'In Spa'}"`,
+                        `"${t.room || ''}"`, 
+                        `"${t.paymentMethod || 'Cash'}"`, // ADDED: Payment Method
                         t.transportFee || '0',
                         t.amount, 
                         commissionAmount.toFixed(2), 
@@ -1209,6 +1223,61 @@
 
             // --- 4. ACTIONS ---
 
+            // Helper to handle adding/removing therapists
+            const toggleTherapistSelection = (name) => {
+                if (selectedTherapists.includes(name)) {
+                    // Remove
+                    setSelectedTherapists(prev => prev.filter(t => t !== name));
+                    setTherapistRows(prev => {
+                        const copy = { ...prev };
+                        delete copy[name];
+                        return copy;
+                    });
+                } else {
+                    // Add
+                    setSelectedTherapists(prev => [...prev, name]);
+                    // Initialize this therapist's row with the current global form values as defaults
+                    setTherapistRows(prev => ({
+                        ...prev,
+                        [name]: {
+                            service: formData.service,
+                            duration: formData.duration, 
+                            amount: formData.amount 
+                        }
+                    }));
+                }
+            };
+
+            // Helper to handle adding/removing drivers
+            const toggleDriverSelection = (name) => {
+                if (selectedDrivers.includes(name)) {
+                    setSelectedDrivers(prev => prev.filter(d => d !== name));
+                } else {
+                    setSelectedDrivers(prev => [...prev, name]);
+                }
+            };
+
+            // Helper to update specific therapist row
+            const updateTherapistRow = (name, field, value) => {
+                setTherapistRows(prev => {
+                    const currentRow = prev[name] || {};
+                    const updatedRow = { ...currentRow, [field]: value };
+                    
+                    // Recalculate price if service or duration changes
+                    if (field === 'service' || field === 'duration') {
+                        // Use the new value for the changed field, or existing/default for the other
+                        const sName = field === 'service' ? value : (updatedRow.service || formData.service);
+                        const dName = field === 'duration' ? value : (updatedRow.duration || formData.duration);
+                        
+                        const newPrice = calculatePrice(sName, dName, 0); // 0 transport (raw service price)
+                        updatedRow.amount = newPrice;
+                    }
+
+                    return { ...prev, [name]: updatedRow };
+                });
+            };
+
+            // ADDED: Logic for listType === 'driver'
             const handleAddItem = async (listType, itemName, extraData = null) => {
                 const trimmedItemName = itemName.trim();
                 if (!trimmedItemName) return;
@@ -1229,6 +1298,12 @@
                 } else if (listType === 'duration') {
                     collectionName = 'durations';
                     checkList = durationsList;
+                } else if (listType === 'driver') {
+                    collectionName = 'drivers';
+                    checkList = driversList;
+                } else if (listType === 'room') { // ADDED
+                    collectionName = 'rooms';
+                    checkList = roomsList;
                 } else {
                     return;
                 }
@@ -1253,6 +1328,8 @@
                 if (listType === 'therapist') collectionName = 'therapists';
                 else if (listType === 'service') collectionName = 'services';
                 else if (listType === 'duration') collectionName = 'durations';
+                else if (listType === 'driver') collectionName = 'drivers'; 
+                else if (listType === 'room') collectionName = 'rooms'; // ADDED
                 else return;
 
                 const basePath = `artifacts/${fb.appId}/public/data`;
@@ -1287,6 +1364,14 @@
                 else if (listType === 'duration') {
                     collectionName = 'durations';
                     checkList = durationsList;
+                }
+                else if (listType === 'driver') {
+                    collectionName = 'drivers';
+                    checkList = driversList;
+                }
+                else if (listType === 'room') { // ADDED
+                    collectionName = 'rooms';
+                    checkList = roomsList;
                 }
                 else return;
 
@@ -1401,9 +1486,13 @@
             const handleServiceChange = (serviceName) => {
                 const newPrice = calculatePrice(serviceName, formData.duration, formData.transportFee);
                 setFormData({ ...formData, service: serviceName, amount: newPrice });
+                
+                // Optional: Update all existing rows if user changes main dropdown? 
+                // Let's NOT do that to preserve customizations. Main dropdown acts as default for NEW selections.
             };
 
             const handleDurationChange = (durationName) => {
+                // Just update global default, don't overwrite existing rows to allow mixed durations
                 const newPrice = calculatePrice(formData.service, durationName, formData.transportFee);
                 setFormData({ ...formData, duration: durationName, amount: newPrice });
             };
@@ -1416,8 +1505,14 @@
             
             const toggleLocation = (loc) => {
                 let newTransport = formData.transportFee;
+                let newDriver = formData.driver;
+                let newRoom = formData.room;
+
                 if (loc === 'spa') {
                     newTransport = ''; 
+                    newDriver = ''; // Reset driver if in spa
+                } else {
+                    newRoom = ''; // Reset room if home service
                 }
                 
                 const transportVal = loc === 'spa' ? 0 : (parseFloat(newTransport) || 0);
@@ -1427,6 +1522,8 @@
                     ...formData,
                     location: loc,
                     transportFee: newTransport,
+                    driver: newDriver,
+                    room: newRoom, // Update room
                     amount: newPrice
                 });
             };
@@ -1447,97 +1544,158 @@
                             return;
                     }
                 } else {
-                    if (!formData.clientName || !formData.amount || !formData.service || !formData.therapist) {
-                        setModal({ isOpen: true, type: 'alert', title: 'Missing Information', message: 'Please ensure Client Name, Service, Therapist, and Price are all entered.', onConfirm: closeModal, confirmColor: 'red' });
-                        return;
+                    // Updated Validation for Multi-Therapist (Simplified)
+                    if (!formData.clientName) {
+                         setModal({ isOpen: true, type: 'alert', title: 'Missing Information', message: 'Please enter a Client Name.', onConfirm: closeModal, confirmColor: 'red' });
+                         return;
                     }
 
-                    const allBookings = [...transactions, ...offlineQueue];
-                    const isConflict = allBookings.some(t =>  
-                        t.therapist === formData.therapist &&  
-                        t.time === formData.time &&
-                        (t.bookingDate || formatDate(t.timestamp)) === formData.bookingDate && 
-                        t.type !== 'expense'
-                    );
+                    if (selectedTherapists.length === 0) {
+                         setModal({ isOpen: true, type: 'alert', title: 'Missing Therapist', message: 'Please add at least one Therapist.', onConfirm: closeModal, confirmColor: 'red' });
+                         return;
+                    }
+                    
+                    // Validate individual rows
+                    for (const name of selectedTherapists) {
+                        const row = therapistRows[name];
+                        if (!row || !row.service || !row.amount || !row.duration) {
+                            setModal({ isOpen: true, type: 'alert', title: 'Missing Details', message: `Please ensure Service, Duration, and Price are set for therapist ${name}.`, onConfirm: closeModal, confirmColor: 'red' });
+                            return;
+                        }
+                    }
 
-                    if (isConflict) {
-                        setModal({ isOpen: true, type: 'alert', title: 'Booking Conflict', message: `Therapist ${formData.therapist} is already booked at ${formData.time} on ${formData.bookingDate}.`, onConfirm: closeModal, confirmColor: 'red' });
+                    // Conflict Check (Loop through all selected therapists)
+                    const allBookings = [...transactions, ...offlineQueue];
+                    const conflict = selectedTherapists.find(thName => {
+                        return allBookings.some(t =>  
+                            t.therapist === thName &&  
+                            t.time === formData.time &&
+                            (t.bookingDate || formatDate(t.timestamp)) === formData.bookingDate && 
+                            t.type !== 'expense'
+                        );
+                    });
+
+                    if (conflict) {
+                        setModal({ isOpen: true, type: 'alert', title: 'Booking Conflict', message: `Therapist ${conflict} is already booked at ${formData.time} on ${formData.bookingDate}.`, onConfirm: closeModal, confirmColor: 'red' });
                         return;
                     }
                 }
                 
-                let amountValue = parseFloat(formData.amount);
+                let baseAmount = parseFloat(formData.amount);
                 if (transactionType === 'expense') {
-                    amountValue = -Math.abs(amountValue);
+                    baseAmount = -Math.abs(baseAmount);
                 }
 
-                const transactionPayload = {
-                    clientName: formData.clientName || formData.category, 
-                    description: formData.notes, 
-                    service: formData.service,
-                    category: formData.category, 
-                    therapist: formData.therapist,
-                    amount: amountValue,
-                    duration: formData.duration,
-                    type: transactionType,
-                    status: transactionType === 'expense' ? 'completed' : (transactionType === 'sale' ? 'completed' : 'pending'),
-                    time: formData.time,
-                    bookingDate: formData.bookingDate, 
-                    recordedBy: user.name,
-                    branch: transactionBranch,
-                    notes: formData.notes.trim(),
-                    location: formData.location || 'spa',
-                    transportFee: formData.transportFee || 0
-                };
+                // Prepare list of transactions to save
+                const transactionsToSave = [];
+                
+                if (transactionType === 'expense') {
+                    transactionsToSave.push({
+                        clientName: formData.category, 
+                        description: formData.notes, 
+                        category: formData.category, 
+                        amount: baseAmount,
+                        type: transactionType,
+                        status: 'completed',
+                        time: formData.time,
+                        bookingDate: formData.bookingDate, 
+                        recordedBy: user.name,
+                        branch: transactionBranch,
+                        notes: formData.notes.trim(),
+                        location: formData.location || 'spa'
+                    });
+                } else {
+                    // Booking/Sale Logic
+                    // We split the Transport Fee across therapists to avoid inflating the total revenue in stats
+                    const totalTransport = parseFloat(formData.transportFee) || 0;
+                    const splitTransport = selectedTherapists.length > 0 ? (totalTransport / selectedTherapists.length) : 0;
+                    
+                    // Create driver string
+                    const driverString = selectedDrivers.length > 0 ? selectedDrivers.join(', ') : '';
+
+                    selectedTherapists.forEach(thName => {
+                        const row = therapistRows[thName];
+                        // Row amount is the Service Price. We add splitTransport to it for the record.
+                        const rowServicePrice = parseFloat(row.amount);
+                        const finalRowAmount = rowServicePrice + splitTransport;
+
+                        transactionsToSave.push({
+                            clientName: formData.clientName, 
+                            clientContact: formData.clientContact, 
+                            description: formData.notes, 
+                            service: row.service, 
+                            therapist: thName,
+                            amount: finalRowAmount, 
+                            duration: row.duration, 
+                            type: transactionType,
+                            status: transactionType === 'sale' ? 'completed' : 'pending',
+                            time: formData.time,
+                            bookingDate: formData.bookingDate, 
+                            recordedBy: user.name,
+                            branch: transactionBranch,
+                            notes: formData.notes.trim(),
+                            location: formData.location || 'spa',
+                            transportFee: splitTransport, // Split fee
+                            driver: formData.location === 'home' ? driverString : '',
+                            room: formData.location === 'spa' ? formData.room : '',
+                            paymentMethod: formData.paymentMethod // ADDED: Save payment method
+                        });
+                    });
+                }
 
                 if (!isOnline) {
-                    const newOfflineItem = {
-                        ...transactionPayload,
-                        localId: Date.now(), 
+                    const offlineItems = transactionsToSave.map(t => ({
+                        ...t,
+                        localId: Date.now() + Math.random(), 
                         timestamp: Date.now() 
-                    };
-                    setOfflineQueue(prev => [...prev, newOfflineItem]);
+                    }));
                     
-                    const resetTargetBranch = user.currentBranch === 'ALL' ? transactionBranch : user.currentBranch;
-                    setFormData({  
-                        clientName: '', service: '', duration: '', therapist: '', amount: '',  
-                        type: 'booking', time: new Date().toTimeString().slice(0, 5),  
-                        targetBranch: resetTargetBranch, notes: '', category: '',
-                        bookingDate: new Date().toISOString().split('T')[0],
-                        location: 'spa', transportFee: ''
-                    });
-
-                    setModal({ isOpen: true, type: 'alert', title: 'Saved Offline', message: `${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} queued. Will sync when online.`, onConfirm: closeModal, confirmColor: 'orange' });
+                    setOfflineQueue(prev => [...prev, ...offlineItems]);
+                    
+                    // Reset Form
+                    resetForm(transactionBranch);
+                    setModal({ isOpen: true, type: 'alert', title: 'Saved Offline', message: `${transactionsToSave.length} records queued.`, onConfirm: closeModal, confirmColor: 'orange' });
                     return;
                 }
 
                 setIsGlobalLoading(true);
                 try {
                     const basePath = `artifacts/${fb.appId}/public/data`;
-                    await fb.db.collection(`${basePath}/transactions`).add({
-                        ...transactionPayload,
+                    
+                    // Batch writes using Promise.all
+                    const promises = transactionsToSave.map(t => fb.db.collection(`${basePath}/transactions`).add({
+                        ...t,
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    const resetTargetBranch = user.currentBranch === 'ALL' ? transactionBranch : user.currentBranch;
+                    }));
                     
-                    setFormData({  
-                        clientName: '', service: '', duration: '', therapist: '', amount: '',  
-                        type: 'booking', time: new Date().toTimeString().slice(0, 5),
-                        targetBranch: resetTargetBranch, notes: '', category: '',
-                        bookingDate: new Date().toISOString().split('T')[0],
-                        location: 'spa', transportFee: ''
-                    });
-                    
-                    setModal({ isOpen: true, type: 'alert', title: 'Record Saved!', message: `${transactionType.charAt(0).toUpperCase() + transactionType.slice(1)} saved for ${transactionBranch}.`, onConfirm: closeModal, confirmColor: 'logo-green' });
+                    await Promise.all(promises);
 
-                    setDashboardDate(transactionPayload.bookingDate);
+                    resetForm(transactionBranch);
+                    
+                    setModal({ isOpen: true, type: 'alert', title: 'Saved!', message: `${transactionsToSave.length} record(s) saved for ${transactionBranch}.`, onConfirm: closeModal, confirmColor: 'logo-green' });
+
+                    setDashboardDate(formData.bookingDate); // Update view to booking date
                     setView('dashboard');
                 } catch (error) {
-                    setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'Failed to save record. Please check connection.', onConfirm: closeModal, confirmColor: 'red' });
+                    setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'Failed to save. Check connection.', onConfirm: closeModal, confirmColor: 'red' });
                 } finally {
                     setIsGlobalLoading(false);
                 }
+            };
+
+            const resetForm = (branch) => {
+                const resetTargetBranch = user.currentBranch === 'ALL' ? branch : user.currentBranch;
+                setFormData({  
+                    clientName: '', clientContact: '', service: '', duration: '', therapist: '', amount: '',  
+                    type: 'booking', time: new Date().toTimeString().slice(0, 5),
+                    targetBranch: resetTargetBranch, notes: '', category: '',
+                    bookingDate: new Date().toISOString().split('T')[0],
+                    location: 'spa', transportFee: '', driver: '', room: '',
+                    paymentMethod: 'Cash' // Reset to Cash
+                });
+                setSelectedTherapists([]); // Clear selection
+                setSelectedDrivers([]); // Clear drivers
+                setTherapistRows({}); // Clear rows
             };
 
             const toggleStatus = async (t) => {
@@ -1840,7 +1998,6 @@
                         <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-sm border border-logo-green-100 text-center relative overflow-hidden">
                             <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-logo-green-700 to-teal-600"></div>
                             
-                            {/* Removed logo circle/text. Retained only the title. */}
                             <h1 className="text-3xl font-extrabold text-logo-green-900 mb-1">AHMAS System</h1>
                             <p className="text-slate-500 mb-6 text-sm">Staff Portal</p>
                             
@@ -1848,9 +2005,9 @@
                                 <div className="relative">
                                     <Icons.MapPin size={18} className="absolute left-3 top-3.5 text-slate-400" />
                                     <select required value={loginBranch} onChange={(e)=>setLoginBranch(e.target.value)} className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-logo-green-700 bg-slate-50 focus:bg-white appearance-none text-slate-600">
-                                        <option value="" disabled>Select Branch Location</option>
-                                        {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
-                                        <option value="ALL" className="font-bold text-logo-green-700">ALL BRANCHES (Owner View)</option>
+                                            <option value="" disabled>Select Branch Location</option>
+                                            {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
+                                            <option value="ALL" className="font-bold text-logo-green-700">ALL BRANCHES (Owner View)</option>
                                     </select>
                                     <Icons.ChevronDown size={16} className="absolute right-3 top-4 text-slate-400 pointer-events-none"/>
                                 </div>
@@ -1872,17 +2029,16 @@
                     <header className="bg-white border-b border-logo-green-100 sticky top-0 z-20 shadow-sm">
                         <div className="max-w-3xl mx-auto px-4 py-3 flex justify-between items-center">
                             <div className="flex items-center gap-3">
-                                {/* NEW: Only the main title text remains */}
                                 <h1 className="text-xl font-extrabold text-logo-green-800 leading-tight">AHMAS System</h1>
                                 <div>
                                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                                        <span className="bg-logo-green-100 text-logo-green-700 px-2 py-0.5 rounded flex items-center gap-1"><Icons.MapPin size={10}/> {user.currentBranch}</span>
-                                        <span className="flex items-center gap-1"><Icons.UserCircle2 size={10}/> {user.name}</span>
-                                        {offlineQueue.length > 0 && (
-                                            <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded flex items-center gap-1 animate-pulse">
-                                                <Icons.WifiOff size={10}/> {offlineQueue.length} Pending
-                                            </span>
-                                        )}
+                                            <span className="bg-logo-green-100 text-logo-green-700 px-2 py-0.5 rounded flex items-center gap-1"><Icons.MapPin size={10}/> {user.currentBranch}</span>
+                                            <span className="flex items-center gap-1"><Icons.UserCircle2 size={10}/> {user.name}</span>
+                                            {offlineQueue.length > 0 && (
+                                                <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded flex items-center gap-1 animate-pulse">
+                                                    <Icons.WifiOff size={10}/> {offlineQueue.length} Pending
+                                                </span>
+                                            )}
                                     </div>
                                 </div>
                             </div>
@@ -1899,10 +2055,8 @@
                         <div className="flex p-1 bg-slate-200/60 rounded-xl mb-6 sticky top-[70px] z-10 backdrop-blur-sm overflow-x-auto">
                             <button onClick={()=>setView('dashboard')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='dashboard'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.LayoutDashboard size={16}/> Daily</button>
                             <button onClick={()=>setView('add')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='add'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.Plus size={16}/> Booking</button>
-                            {/* UPDATED: Expense button label */}
                             <button onClick={()=>setView('expense')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='expense'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.MinusCircle size={16}/> Expense</button>
                             <button onClick={()=>setView('profile')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='profile'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.UserCog size={16}/> Profile</button>
-                            {/* REVERTED: Only show Lists/History/Team if role is 'admin' */}
                             {user.role === 'admin' && <button onClick={()=>setView('lists')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='lists'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.ShieldCheck size={16}/> Lists</button>}
                             
                             <button onClick={()=>setView('history')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='history'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'}`}><Icons.History size={16}/> History</button>
@@ -1910,7 +2064,6 @@
                             {user.role === 'admin' && (
                                 <button onClick={()=>setView('team')} className={`flex-1 min-w-[70px] py-2.5 text-xs font-semibold rounded-lg flex flex-col sm:flex-row items-center justify-center gap-1 ${view==='team'?'bg-white text-logo-green-700 shadow-sm':'text-slate-500'} relative`}>
                                     <Icons.Users size={16}/> Team
-                                    {/* Badge on Navigation Tab */}
                                     {(() => {
                                         if (user.username !== 'admin') return null;
                                         const count = users.filter(u => isUserOnline(u.lastActive)).length;
@@ -1957,39 +2110,39 @@
                                 {/* NEW: ALL BRANCH SUMMARY (Owner Admin only) */}
                                 {user.currentBranch === 'ALL' && user.role === 'admin' && branchFinancials && branchFinancials.length > 0 && (  
                                     <div className="bg-white p-4 rounded-xl shadow-lg border border-teal-100 space-y-4">
-                                        <h3 className="text-sm font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2"><Icons.TrendingUp size={16}/> All Branch Summary</h3>
-                                        <div className="grid grid-cols-2 gap-3 mb-4 border-b pb-3 border-slate-100">
-                                            <div className="bg-logo-green-50 p-3 rounded-lg"><p className="text-xs font-medium text-logo-green-700 uppercase">Combined Revenue</p><p className="text-lg font-bold text-logo-green-900">{formatCurrency(stats.totalRevenue)}</p></div>
-                                            <div className="bg-red-50 p-3 rounded-lg"><p className="text-xs font-medium text-red-700 uppercase">Total Expenses</p><p className="text-lg font-bold text-red-900">{formatCurrency(stats.totalExpenses)}</p></div>
-                                        </div>
-                                        <div className="overflow-x-auto">
-                                            <table className="min-w-full text-xs text-left">
-                                                <thead className="text-slate-500 uppercase bg-slate-50">
-                                                    <tr>
-                                                        <th className="px-2 py-2">Branch</th>
-                                                        <th className="px-2 py-2 text-right">Net Cash</th>
-                                                        <th className="px-2 py-2 text-right text-red-600">Expenses</th>
-                                                        <th className="px-2 py-2 text-right">Trans.</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {branchFinancials.map((b) => (
-                                                        <tr key={b.branch} className="border-b hover:bg-teal-50/50 transition">
-                                                            <td className="px-2 py-2 font-semibold text-slate-700">{b.branch}</td>
-                                                            <td className={`px-2 py-2 text-right font-bold ${b.netCash < 0 ? 'text-red-600' : 'text-logo-green-700'}`}>{formatCurrency(b.netCash)}</td>
-                                                            <td className="px-2 py-2 text-right text-red-500">{formatCurrency(b.totalExpenses)}</td>
-                                                            <td className="px-2 py-2 text-right text-slate-500">{b.count}</td>
+                                            <h3 className="text-sm font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2"><Icons.TrendingUp size={16}/> All Branch Summary</h3>
+                                            <div className="grid grid-cols-2 gap-3 mb-4 border-b pb-3 border-slate-100">
+                                                <div className="bg-logo-green-50 p-3 rounded-lg"><p className="text-xs font-medium text-logo-green-700 uppercase">Combined Revenue</p><p className="text-lg font-bold text-logo-green-900">{formatCurrency(stats.totalRevenue)}</p></div>
+                                                <div className="bg-red-50 p-3 rounded-lg"><p className="text-xs font-medium text-red-700 uppercase">Total Expenses</p><p className="text-lg font-bold text-red-900">{formatCurrency(stats.totalExpenses)}</p></div>
+                                            </div>
+                                            <div className="overflow-x-auto">
+                                                <table className="min-w-full text-xs text-left">
+                                                    <thead className="text-slate-500 uppercase bg-slate-50">
+                                                        <tr>
+                                                            <th className="px-2 py-2">Branch</th>
+                                                            <th className="px-2 py-2 text-right">Net Cash</th>
+                                                            <th className="px-2 py-2 text-right text-red-600">Expenses</th>
+                                                            <th className="px-2 py-2 text-right">Trans.</th>
                                                         </tr>
-                                                    ))}
-                                                    <tr className="bg-logo-green-100 font-extrabold text-sm text-logo-green-900 border-t-2 border-logo-green-700">
-                                                        <td className="px-2 py-2">GRAND TOTAL</td>
-                                                        <td className={`px-2 py-2 text-right ${stats.netCash < 0 ? 'text-red-600 font-bold' : ''}`}>{formatCurrency(stats.netCash)}</td>
-                                                        <td className="px-2 py-2 text-right text-red-600">{formatCurrency(stats.totalExpenses)}</td>
-                                                        <td className="px-2 py-2 text-right">{transactions.length}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                                    </thead>
+                                                    <tbody>
+                                                        {branchFinancials.map((b) => (
+                                                            <tr key={b.branch} className="border-b hover:bg-teal-50/50 transition">
+                                                                <td className="px-2 py-2 font-semibold text-slate-700">{b.branch}</td>
+                                                                <td className={`px-2 py-2 text-right font-bold ${b.netCash < 0 ? 'text-red-600' : 'text-logo-green-700'}`}>{formatCurrency(b.netCash)}</td>
+                                                                <td className="px-2 py-2 text-right text-red-500">{formatCurrency(b.totalExpenses)}</td>
+                                                                <td className="px-2 py-2 text-right text-slate-500">{b.count}</td>
+                                                            </tr>
+                                                        ))}
+                                                        <tr className="bg-logo-green-100 font-extrabold text-sm text-logo-green-900 border-t-2 border-logo-green-700">
+                                                            <td className="px-2 py-2">GRAND TOTAL</td>
+                                                            <td className={`px-2 py-2 text-right ${stats.netCash < 0 ? 'text-red-600 font-bold' : ''}`}>{formatCurrency(stats.netCash)}</td>
+                                                            <td className="px-2 py-2 text-right text-red-600">{formatCurrency(stats.totalExpenses)}</td>
+                                                            <td className="px-2 py-2 text-right">{transactions.length}</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </table>
+                                            </div>
                                     </div>
                                 )}
                                 {/* END ALL BRANCH SUMMARY */}
@@ -2018,31 +2171,31 @@
                                              if (idxA === -1) return 1;
                                              if (idxB === -1) return -1;
                                              return idxA - idxB;
-                                            }).map(branch => (
-                                                <div key={branch} className="mb-4 last:mb-0">
-                                                    {(user.currentBranch === 'ALL' || Object.keys(therapistStats).length > 1) && (
-                                                        <h4 className="text-[10px] font-bold text-logo-green-700 uppercase mb-2 bg-logo-green-50 px-2 py-1 rounded inline-block">
-                                                            {branch}
-                                                        </h4>
-                                                    )}
-                                                    <div className="space-y-2">
-                                                        {therapistStats[branch].map((s) => (
-                                                            <div key={s.name} className="flex justify-between items-center pb-2 border-b border-slate-50 last:border-0 last:pb-0 ml-1">
-                                                                <div className="flex gap-2 items-center">
-                                                                    <span className="w-6 h-6 bg-logo-green-100 text-logo-green-700 rounded-full flex items-center justify-center text-[10px] font-bold">{s.name.charAt(0)}</span>
-                                                                    <span className="text-sm font-semibold text-slate-700">{s.name}</span>
-                                                                </div>
-                                                                <div className="text-right flex flex-col">
-                                                                    <span className="text-sm font-bold text-logo-green-700 flex items-center gap-1">
-                                                                        <Icons.TrendingUp size={12} className="text-teal-600"/> {formatCurrency(s.commission)}  
-                                                                    </span>
-                                                                    <span className="text-[9px] text-slate-400">({s.rate}% of {formatCurrency(s.amount)})</span>
-                                                                </div>
+                                          }).map(branch => (
+                                            <div key={branch} className="mb-4 last:mb-0">
+                                                {(user.currentBranch === 'ALL' || Object.keys(therapistStats).length > 1) && (
+                                                    <h4 className="text-[10px] font-bold text-logo-green-700 uppercase mb-2 bg-logo-green-50 px-2 py-1 rounded inline-block">
+                                                        {branch}
+                                                    </h4>
+                                                )}
+                                                <div className="space-y-2">
+                                                    {therapistStats[branch].map((s) => (
+                                                        <div key={s.name} className="flex justify-between items-center pb-2 border-b border-slate-50 last:border-0 last:pb-0 ml-1">
+                                                            <div className="flex gap-2 items-center">
+                                                                <span className="w-6 h-6 bg-logo-green-100 text-logo-green-700 rounded-full flex items-center justify-center text-[10px] font-bold">{s.name.charAt(0)}</span>
+                                                                <span className="text-sm font-semibold text-slate-700">{s.name}</span>
                                                             </div>
-                                                        ))}
-                                                    </div>
+                                                            <div className="text-right flex flex-col">
+                                                                <span className="text-sm font-bold text-logo-green-700 flex items-center gap-1">
+                                                                    <Icons.TrendingUp size={12} className="text-teal-600"/> {formatCurrency(s.commission)}  
+                                                                </span>
+                                                                <span className="text-[9px] text-slate-400">({s.rate}% of {formatCurrency(s.amount)})</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))
+                                            </div>
+                                          ))
                                     )}
                                 </div>
 
@@ -2090,71 +2243,88 @@
 
                                     {filteredTransactions.length===0?<div className="text-center py-12 border border-dashed rounded-xl text-slate-400 text-sm">No records found for the current filter.</div>:
                                     <div className="space-y-3">
-                                        {filteredTransactions.map(t=>(
-                                            // UPDATED: Conditional styling based on type
-                                            <div key={t.id} className={`bg-white p-4 rounded-xl border-l-[6px] flex justify-between items-start ${
-                                                t.type === 'expense' ? 'border-l-red-500' : (t.status==='completed'?'border-l-logo-green-500':'border-l-orange-400')
-                                            } shadow-sm`}>
-                                                <div className="flex-1 pr-4">
-                                                    {/* Displaying timestamp date for consistency */}
-                                                    <div className="flex gap-2 mb-1 items-center">
-                                                        <span className="text-[10px] font-bold bg-slate-100 px-2 rounded text-slate-500">{t.branch}</span>
-                                                        <span className="text-xs font-mono text-slate-400">{t.bookingDate || formatDate(t.timestamp)} - {t.time}</span>
-                                                        {/* Home Service Badge */}
-                                                        {t.location === 'home' && (
-                                                            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 rounded flex items-center gap-1">
-                                                                <Icons.Car size={10}/> Home
-                                                            </span>
+                                            {filteredTransactions.map(t=>(
+                                                <div key={t.id} className={`bg-white p-4 rounded-xl border-l-[6px] flex justify-between items-start ${
+                                                    t.type === 'expense' ? 'border-l-red-500' : (t.status==='completed'?'border-l-logo-green-500':'border-l-orange-400')
+                                                } shadow-sm`}>
+                                                    <div className="flex-1 pr-4">
+                                                        <div className="flex gap-2 mb-1 items-center">
+                                                            <span className="text-[10px] font-bold bg-slate-100 px-2 rounded text-slate-500">{t.branch}</span>
+                                                            <span className="text-xs font-mono text-slate-400">{t.bookingDate || formatDate(t.timestamp)} - {t.time}</span>
+                                                            {/* Home Service Badge */}
+                                                            {t.location === 'home' && (
+                                                                <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 rounded flex items-center gap-1">
+                                                                    <Icons.Car size={10}/> Home {t.driver && <span className="font-normal text-blue-600">via {t.driver}</span>}
+                                                                </span>
+                                                            )}
+                                                            {/* ADDED: Room Badge */}
+                                                            {t.location !== 'home' && t.room && (
+                                                                <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 rounded flex items-center gap-1 border border-slate-200">
+                                                                    <Icons.DoorOpen size={10}/> Rm: {t.room}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        <h3 className={`font-bold ${t.type === 'expense' ? 'text-red-700' : 'text-slate-800'}`}>
+                                                            {t.type === 'expense' ? `Expense: ${t.category}` : t.clientName}
+                                                            {/* ADDED: Display Contact on Dashboard */}
+                                                            {t.clientContact && t.type !== 'expense' && <span className="text-xs font-normal text-slate-500 ml-2"><Icons.User size={10} className="inline"/> {t.clientContact}</span>}
+                                                        </h3>
+                                                        
+                                                        <div className="text-xs text-slate-500 mt-1 flex gap-2 flex-wrap items-center">
+                                                            {t.type === 'expense' ? (
+                                                                <span>{t.notes}</span>
+                                                            ) : (
+                                                                <>
+                                                                    <span>{t.service}</span>
+                                                                    {t.duration && <span> • {t.duration}</span>}
+                                                                    <span> • {t.therapist}</span>
+                                                                    {/* ADDED: Payment Method Badge */}
+                                                                    {t.paymentMethod && (
+                                                                        <span className={`ml-1 flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase ${
+                                                                            t.paymentMethod === 'GCash' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                                                            t.paymentMethod === 'Card' ? 'bg-purple-50 text-purple-600 border-purple-200' :
+                                                                            'bg-emerald-50 text-emerald-600 border-emerald-200'
+                                                                        }`}>
+                                                                            {t.paymentMethod === 'GCash' && <Icons.Smartphone size={8} />}
+                                                                            {t.paymentMethod === 'Card' && <Icons.CreditCard size={8} />}
+                                                                            {t.paymentMethod === 'Cash' && <Icons.Banknote size={8} />}
+                                                                            {t.paymentMethod}
+                                                                        </span>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {t.notes && t.notes.trim() && t.type !== 'expense' && (
+                                                            <div className="mt-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 text-slate-700 flex items-start gap-1">
+                                                                <Icons.ClipboardList size={14} className="min-w-[14px] text-logo-green-700 mt-[2px]"/>
+                                                                <span className="font-medium">Notes: </span>
+                                                                <span className="italic">{t.notes}</span>
+                                                            </div>
                                                         )}
                                                     </div>
                                                     
-                                                    {/* UPDATED: Display clientName or category */}
-                                                    <h3 className={`font-bold ${t.type === 'expense' ? 'text-red-700' : 'text-slate-800'}`}>
-                                                        {t.type === 'expense' ? `Expense: ${t.category}` : t.clientName}
-                                                    </h3>
-                                                    
-                                                    <div className="text-xs text-slate-500 mt-1 flex gap-2 flex-wrap">
-                                                        {t.type === 'expense' ? (
-                                                            <span>{t.notes}</span>
-                                                        ) : (
-                                                            <>
-                                                                <span>{t.service}</span>
-                                                                {t.duration && <span> • {t.duration}</span>}
-                                                                <span> • {t.therapist}</span>
-                                                            </>
+                                                    <div className="text-right min-w-[80px]">
+                                                        <div className={`font-bold text-lg ${t.type === 'expense' ? 'text-red-600' : (t.status==='completed'?'text-logo-green-700':'text-orange-600')}`}>{formatCurrency(t.amount)}</div>
+                                                        
+                                                        {t.transportFee && Number(t.transportFee) > 0 && (
+                                                            <div className="text-[10px] text-slate-400">
+                                                                (Inc. {formatCurrency(t.transportFee)} Trans.)
+                                                            </div>
                                                         )}
-                                                    </div>
-                                                    {/* Note display */}
-                                                    {t.notes && t.notes.trim() && t.type !== 'expense' && (
-                                                        <div className="mt-2 text-xs bg-slate-50 p-2 rounded border border-slate-200 text-slate-700 flex items-start gap-1">
-                                                            <Icons.ClipboardList size={14} className="min-w-[14px] text-logo-green-700 mt-[2px]"/>
-                                                            <span className="font-medium">Notes: </span>
-                                                            <span className="italic">{t.notes}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                
-                                                <div className="text-right min-w-[80px]">
-                                                    <div className={`font-bold text-lg ${t.type === 'expense' ? 'text-red-600' : (t.status==='completed'?'text-logo-green-700':'text-orange-600')}`}>{formatCurrency(t.amount)}</div>
-                                                    
-                                                    {/* Transport Fee Indicator */}
-                                                    {t.transportFee && Number(t.transportFee) > 0 && (
-                                                        <div className="text-[10px] text-slate-400">
-                                                            (Inc. {formatCurrency(t.transportFee)} Trans.)
-                                                        </div>
-                                                    )}
 
-                                                    <div className="flex justify-end gap-2 mt-1">
-                                                        {t.type !== 'expense' && (
-                                                            <button onClick={()=>toggleStatus(t)} className={`p-1.5 rounded-full ${t.status==='completed'?'bg-logo-green-100 text-logo-green-700':'bg-orange-100 text-orange-600'}`}>
-                                                                {t.status==='completed'?<Icons.CheckCircle2 size={16}/>:<Icons.DollarSign size={16}/>}
-                                                            </button>
-                                                        )}
-                                                        {user.role==='admin'&&<button onClick={()=>requestDelete(t.id)} className="p-1.5 text-slate-300 hover:text-red-500"><Icons.Trash2 size={16}/></button>}  
+                                                        <div className="flex justify-end gap-2 mt-1">
+                                                            {t.type !== 'expense' && (
+                                                                <button onClick={()=>toggleStatus(t)} className={`p-1.5 rounded-full ${t.status==='completed'?'bg-logo-green-100 text-logo-green-700':'bg-orange-100 text-orange-600'}`}>
+                                                                    {t.status==='completed'?<Icons.CheckCircle2 size={16}/>:<Icons.DollarSign size={16}/>}
+                                                                </button>
+                                                            )}
+                                                            {user.role==='admin'&&<button onClick={()=>requestDelete(t.id)} className="p-1.5 text-slate-300 hover:text-red-500"><Icons.Trash2 size={16}/></button>}  
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
                                     </div>}
                                 </div>
                             </div>
@@ -2215,19 +2385,65 @@
                                         </button>
                                     </div>
 
-                                    {/* Transport Charge Input (Conditional) */}
+                                    {/* Spa Specifics (Room Selection) - ADDED */}
+                                    {formData.location === 'spa' && (
+                                        <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 animate-fadeIn">
+                                            <label className="text-xs font-bold text-slate-500 mb-1 block flex items-center gap-1"><Icons.DoorOpen size={12}/> Assigned Room</label>
+                                            <select 
+                                                value={formData.room} 
+                                                onChange={e => setFormData({...formData, room: e.target.value})}
+                                                className="w-full p-2 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-logo-green-500 bg-white appearance-none text-sm"
+                                            >
+                                                <option value="">Select Room (Optional)</option>
+                                                {roomsList.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
+                                            </select>
+                                            {roomsList.length === 0 && <p className="text-[10px] text-red-400 mt-1 italic">No rooms found. Add in Lists tab (Admin).</p>}
+                                        </div>
+                                    )}
+
+                                    {/* Home Service Specifics (Transport & Driver) */}
                                     {formData.location === 'home' && (
-                                        <div className="bg-blue-50 p-3 rounded-xl border border-blue-200 animate-fadeIn">
-                                            <label className="text-xs font-bold text-blue-700 mb-1 block">Transportation Charge (Not Fixed)</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-3 text-blue-400 font-bold">P</span>
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="0.00" 
-                                                    value={formData.transportFee}
-                                                    onChange={e => handleTransportChange(e.target.value)}
-                                                    className="w-full pl-8 pr-4 py-2 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                                                />
+                                        <div className="bg-blue-50 p-4 rounded-xl border border-blue-200 animate-fadeIn space-y-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-blue-700 mb-1 block">Transportation Charge (Total)</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-3 text-blue-400 font-bold">P</span>
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="0.00" 
+                                                        value={formData.transportFee}
+                                                        onChange={e => handleTransportChange(e.target.value)}
+                                                        className="w-full pl-8 pr-4 py-2 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            <div>
+                                                <label className="text-xs font-bold text-blue-700 mb-1 block flex items-center gap-1"><Icons.SteeringWheel size={12}/> Assigned Drivers</label>
+                                                
+                                                {/* Selected Drivers Tags */}
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    {selectedDrivers.map(dName => (
+                                                        <span key={dName} className="bg-white text-blue-600 text-xs px-2 py-1 rounded-md border border-blue-200 flex items-center gap-1 font-bold shadow-sm">
+                                                            {dName}
+                                                            <button type="button" onClick={() => toggleDriverSelection(dName)} className="hover:text-red-500"><Icons.X size={12}/></button>
+                                                        </span>
+                                                    ))}
+                                                </div>
+
+                                                <select 
+                                                    value="" 
+                                                    onChange={e => {
+                                                        if(e.target.value) toggleDriverSelection(e.target.value);
+                                                    }}
+                                                    className="w-full p-2 rounded-lg border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white appearance-none text-sm"
+                                                >
+                                                    <option value="">+ Add Driver</option>
+                                                    {driversList
+                                                        .filter(d => !selectedDrivers.includes(d.name))
+                                                        .map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                                                </select>
+                                                {driversList.length === 0 && <p className="text-[10px] text-red-400 mt-1 italic">No drivers found. Add in Lists tab (Admin).</p>}
                                             </div>
                                         </div>
                                     )}
@@ -2236,57 +2452,149 @@
                                         <label className={`border-2 rounded-xl p-3 flex flex-col items-center gap-2 ${formData.type==='booking'?'border-logo-green-700 bg-logo-green-50/50':'border-slate-100'}`}><input type="radio" name="type" value="booking" checked={formData.type==='booking'} onChange={(e)=>setFormData({...formData, type:e.target.value})} className="hidden"/><Icons.Calendar/><span className="text-sm font-bold">Appointment</span></label>
                                         <label className={`border-2 rounded-xl p-3 flex flex-col items-center gap-2 ${formData.type==='sale'?'border-teal-600 bg-teal-50/50':'border-slate-100'}`}><input type="radio" name="type" value="sale" checked={formData.type==='sale'} onChange={(e)=>setFormData({...formData, type:e.target.value})} className="hidden"/><Icons.DollarSign/><span className="text-sm font-bold">Direct Pay</span></label>
                                     </div>
-                                    <input required placeholder="Client Name*" value={formData.clientName} onChange={e=>setFormData({...formData, clientName:e.target.value})} className="w-full p-3 border rounded-xl bg-slate-50"/>
+                                    
+                                    <div className="space-y-2">
+                                        <input required placeholder="Client Name*" value={formData.clientName} onChange={e=>setFormData({...formData, clientName:e.target.value})} className="w-full p-3 border rounded-xl bg-slate-50"/>
+                                        {/* ADDED: Client Contact Input */}
+                                        <input placeholder="Client Contact No." value={formData.clientContact} onChange={e=>setFormData({...formData, clientContact:e.target.value})} className="w-full p-3 border rounded-xl bg-slate-50"/>
+                                    </div>
                                     
                                     <div className="space-y-4">
-                                        {/* Service Dropdown */}
-                                        <select required value={formData.service} onChange={e=>handleServiceChange(e.target.value)} className="w-full p-3 border rounded-xl bg-slate-50 appearance-none">
-                                            <option value="" disabled>Select Service*</option>
-                                            {servicesList.map(s => <option key={s.id} value={s.name}>{s.name} {s.price ? `(${formatCurrency(s.price)})` : ''}</option>)}
-                                        </select>
                                         
-                                        {/* Duration Dropdown */}
-                                        <select value={formData.duration} onChange={e=>handleDurationChange(e.target.value)} className="w-full p-3 border rounded-xl bg-slate-50 appearance-none">
-                                            <option value="" disabled>Select Duration</option>
+                                        {/* Duration Dropdown (Global) */}
+                                        <select value={formData.duration} onChange={e=>handleDurationChange(e.target.value)} className="w-full p-3 border rounded-xl bg-slate-50 appearance-none font-bold text-slate-700">
+                                            <option value="" disabled>Select Duration (Applied to all)</option>
                                             {durationsList.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
                                         </select>
 
-                                        {/* Therapist Dropdown */}
-                                        <select required value={formData.therapist} onChange={e=>setFormData({...formData, therapist:e.target.value})} className="w-full p-3 border rounded-xl bg-slate-50 appearance-none">
-                                            <option value="" disabled>Select Therapist*</option>
-                                            {therapistsList.map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
-                                        </select>
+                                        {/* Therapist Dropdown Replacement - Multi Select */}
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold text-slate-500 uppercase flex justify-between items-center">
+                                                <span>Therapists & Services</span>
+                                                <span className="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-400">{selectedTherapists.length} Added</span>
+                                            </label>
+                                            
+                                            {/* Selected Therapists List */}
+                                            {selectedTherapists.length > 0 ? (
+                                                <div className="space-y-3 mb-2">
+                                                    {selectedTherapists.map(name => (
+                                                        <div key={name} className="w-full bg-white border border-logo-green-200 shadow-sm rounded-xl p-3 flex flex-col gap-2 relative fade-in">
+                                                            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+                                                                <span className="font-bold text-logo-green-800 flex items-center gap-2 text-sm"><Icons.User size={16}/> {name}</span>
+                                                                <button type="button" onClick={() => toggleTherapistSelection(name)} className="text-slate-300 hover:text-red-500 transition"><Icons.X size={18}/></button>
+                                                            </div>
+                                                            <div className="flex flex-col gap-2">
+                                                                <select 
+                                                                    value={therapistRows[name]?.service || ''} 
+                                                                    onChange={(e) => updateTherapistRow(name, 'service', e.target.value)}
+                                                                    className="text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-logo-green-500 outline-none w-full"
+                                                                >
+                                                                    <option value="" disabled>Select Service*</option>
+                                                                    {servicesList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                                                </select>
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                    <select 
+                                                                        value={therapistRows[name]?.duration || ''} 
+                                                                        onChange={(e) => updateTherapistRow(name, 'duration', e.target.value)}
+                                                                        className="text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-logo-green-500 outline-none"
+                                                                    >
+                                                                        <option value="" disabled>Duration*</option>
+                                                                        {durationsList.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                                                                    </select>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-2.5 top-2 text-slate-400 text-xs">P</span>
+                                                                        <input 
+                                                                            type="number" 
+                                                                            value={therapistRows[name]?.amount || ''} 
+                                                                            onChange={(e) => updateTherapistRow(name, 'amount', e.target.value)}
+                                                                            className="w-full text-xs p-2 pl-6 border border-slate-200 rounded-lg bg-slate-50 font-bold text-slate-700 focus:bg-white focus:ring-1 focus:ring-logo-green-500 outline-none"
+                                                                            placeholder="0.00"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="p-4 border-2 border-dashed border-slate-200 rounded-xl text-center text-slate-400 text-xs italic bg-slate-50">
+                                                    No therapists added yet.
+                                                </div>
+                                            )}
+
+                                            {/* Add Button */}
+                                            <div className="relative">
+                                                <select 
+                                                    value="" 
+                                                    onChange={e => {
+                                                        if(e.target.value) toggleTherapistSelection(e.target.value);
+                                                    }} 
+                                                    className="w-full p-3 pl-10 border rounded-xl bg-slate-50 appearance-none hover:bg-slate-100 transition cursor-pointer text-logo-green-700 font-bold"
+                                                >
+                                                    <option value="">+ Add Therapist</option>
+                                                    {therapistsList
+                                                        .filter(t => !selectedTherapists.includes(t.name))
+                                                        .map(t => <option key={t.id} value={t.name}>{t.name}</option>)}
+                                                </select>
+                                                <Icons.Plus size={18} className="absolute left-3 top-3.5 text-logo-green-600 pointer-events-none"/>
+                                            </div>
+                                        </div>
                                     </div>
                                     
                                     {/* Service Notes Textarea */}
                                     <textarea  
                                         placeholder="Service Notes (e.g., Hard pressure, No oil on back, Client prefers quiet)"  
-                                        rows="3"
+                                        rows="2"
                                         value={formData.notes}  
                                         onChange={e=>setFormData({...formData, notes:e.target.value})}  
-                                        className="w-full p-3 border rounded-xl bg-slate-50 resize-none"
+                                        className="w-full p-3 border rounded-xl bg-slate-50 resize-none text-sm"
                                     />
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {/* Price is now editable and required, auto-filled by service selection */}
-                                        <input required  
-                                            type="number" step="0.01"  
-                                            placeholder="Total Price (P)*"  
-                                            value={formData.amount}  
-                                            onChange={e=>setFormData({...formData, amount:e.target.value})}  
-                                            className="w-full p-3 border rounded-xl bg-slate-50 font-bold text-lg text-logo-green-800"
-                                        />
-                                        <input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full p-3 border rounded-xl bg-slate-50"/>
+                                    <div className="grid grid-cols-2 gap-4 items-center">
+                                        <input type="time" value={formData.time} onChange={e=>setFormData({...formData, time:e.target.value})} className="w-full p-3 border rounded-xl bg-slate-50 text-center font-bold text-slate-600"/>
+                                        
+                                        <div className="text-right">
+                                            <p className="text-[10px] text-slate-400 uppercase font-bold">Total Estimate</p>
+                                            <p className="text-2xl font-extrabold text-logo-green-700">
+                                                {formatCurrency(
+                                                    selectedTherapists.reduce((acc, name) => acc + (parseFloat(therapistRows[name]?.amount) || 0), 0) + (parseFloat(formData.transportFee) || 0)
+                                                )}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <button className="w-full bg-logo-green-700 text-white font-bold py-4 rounded-xl shadow-lg mt-2">Save Booking</button>
+                                    
+                                    {/* ADDED: Payment Method Selector */}
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 mb-2 block uppercase">Payment Method</label>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {['Cash', 'GCash', 'Card'].map(method => (
+                                                <button
+                                                    type="button"
+                                                    key={method}
+                                                    onClick={() => setFormData({ ...formData, paymentMethod: method })}
+                                                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all ${
+                                                        formData.paymentMethod === method
+                                                            ? 'bg-slate-800 text-white border-slate-800 shadow-md'
+                                                            : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                   {method === 'Cash' && <Icons.Banknote size={18} />}
+                                                   {method === 'GCash' && <Icons.Smartphone size={18} />}
+                                                   {method === 'Card' && <Icons.CreditCard size={18} />}
+                                                   {method}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <button className="w-full bg-logo-green-700 text-white font-bold py-4 rounded-xl shadow-lg mt-2 hover:bg-logo-green-800 transition transform active:scale-95">Save Booking</button>
                                 </form>
                             </div>
                         )}
                         
-                        {/* NEW: Expense Tracking View */}
+                        {/* Expense Tracking View */}
                         {view === 'expense' && (
                             <div className="bg-white rounded-2xl shadow-sm border border-red-100 p-6 fade-in">
-                                {/* UPDATED: Header label */}
                                 <h2 className="text-xl font-bold text-red-700 mb-6 flex items-center gap-2"><Icons.MinusCircle size={24}/> Log Expense</h2>
                                 <form onSubmit={(e) => handleSubmit(e, 'expense')} className="space-y-5">
                                     
@@ -2311,7 +2619,6 @@
                                     <div className="flex gap-2">
                                         <select required value={formData.category} onChange={e=>setFormData({...formData, category:e.target.value})} className="flex-1 p-3 border rounded-xl bg-slate-50 appearance-none">
                                             <option value="" disabled>Select Category*</option>
-                                            {/* UPDATED: Removed "Petty Cash" from category descriptions */}
                                             <option value="Supplies">Supplies (Oil, Linens, etc.)</option>
                                             <option value="Maintenance">Maintenance/Repair</option>
                                             <option value="Utilities">Utilities Payment (Partial)</option>
@@ -2370,6 +2677,8 @@
                                 therapists={therapistsList}  
                                 services={servicesList}
                                 durations={durationsList}
+                                drivers={driversList}
+                                rooms={roomsList} // Pass rooms
                                 onAdd={handleAddItem}  
                                 onDelete={handleDeleteItem}
                                 onEdit={handleEditItem}
