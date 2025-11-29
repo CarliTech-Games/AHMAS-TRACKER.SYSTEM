@@ -12,10 +12,8 @@
     
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- FIXED: Pointing to UMD build for browser compatibility -->
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
-    <!-- Using Firebase Compatibility libraries for broader support -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -27,7 +25,7 @@
                 extend: {
                     colors: {
                         'logo-green': {
-                            50: '#E6FFE6',        // Very light background
+                            50: '#E6FFE6',       // Very light background
                             100: '#CCFFCC',       // Light background
                             500: '#00B300',       // Medium
                             600: '#009900',       // Primary Button Hover
@@ -79,21 +77,31 @@
             'Lapu-lapu',  
             'AS Fortuna'
         ];
+
+        // Service Categories
+        const SERVICE_CATEGORIES = [
+            'Specialized Massage',
+            'Relax & Revive',
+            'Premium Massage',
+            'Add-ons',
+            'Others'
+        ];
         
         // --- FIREBASE CONFIGURATION ---
+        // !!! THIS BLOCK HAS BEEN UPDATED WITH YOUR NEW PROJECT KEYS !!!
         const MANUAL_FIREBASE_CONFIG = {
-            apiKey: "AIzaSyAKXcZwKtFBRFvGbOKd0UnQrLuOLt7wV9M",
-            authDomain: "ahmas-tracker.firebaseapp.com",
-            projectId: "ahmas-tracker",
-            storageBucket: "ahmas-tracker.firebasestorage.app",
-            messagingSenderId: "6650730194",
-            appId: "1:6650730194:web:eedf9c5bcb25cfe12ebf0b",
-            measurementId: "G-XW2GZJXN08"
+            apiKey: "AIzaSyAKfftJL6ZkFCdxVT5wyWWPqtvPd2eRLJk",
+            authDomain: "ahmas-system.firebaseapp.com",
+            databaseURL: "https://ahmas-system-default-rtdb.firebaseio.com",
+            projectId: "ahmas-system",
+            storageBucket: "ahmas-system.firebasestorage.app",
+            messagingSenderId: "3535933918",
+            appId: "1:3535933918:web:24eb6311bd0c49750b0d4f",
+            measurementId: "G-D8SXDWE6SW"
         };
         
         const firebaseConfig = MANUAL_FIREBASE_CONFIG;
         const currentAppId = firebaseConfig.projectId;
-
 
         // --- ICON COMPONENT ---
         const Icon = ({ name, size = 24, className = "", ...props }) => {
@@ -159,7 +167,9 @@
             DoorOpen: (p) => <Icon name="door-open" {...p} />, // ADDED: Icon for Rooms
             CreditCard: (p) => <Icon name="credit-card" {...p} />, // ADDED: Card
             Smartphone: (p) => <Icon name="smartphone" {...p} />, // ADDED: GCash/Phone
-            Banknote: (p) => <Icon name="banknote" {...p} /> // ADDED: Cash
+            Banknote: (p) => <Icon name="banknote" {...p} />, // ADDED: Cash
+            Landmark: (p) => <Icon name="landmark" {...p} />, // ADDED: Bank
+            Map: (p) => <Icon name="map" {...p} />
         };
 
         // --- SECURITY HELPER: Hashing Function ---
@@ -206,7 +216,6 @@
             </div>
         );
 
-
         // --- List Management Component (Admin Only) ---
         // ADDED: rooms prop and logic
         const ListManagement = ({ therapists, services, durations, drivers, rooms, onAdd, onDelete, onEdit }) => {
@@ -214,6 +223,7 @@
             
             // Add State
             const [newItemName, setNewItemName] = useState('');
+            const [newItemCategory, setNewItemCategory] = useState(SERVICE_CATEGORIES[0]); // ADDED: Service Category State
             const [newItemPrices, setNewItemPrices] = useState({});  
             const [newItemCommission, setNewItemCommission] = useState('');  
             
@@ -233,7 +243,8 @@
                 let extraData = null;
                 if (activeTab === 'service') {
                     if (durations.length === 0) return; 
-                    extraData = newItemPrices;
+                    // ADDED: Include category in extraData
+                    extraData = { prices: newItemPrices, category: newItemCategory };
                 } else if (activeTab === 'therapist') {
                     extraData = { commissionRate: parseFloat(newItemCommission) || 0 };
                 }
@@ -348,6 +359,18 @@
                             {/* Dynamic Price Inputs for Services */}
                             {activeTab === 'service' && (
                                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                    {/* ADDED: Category Selector */}
+                                    <div className="mb-3">
+                                        <label className="text-xs font-bold text-slate-500 mb-1 block uppercase">Category</label>
+                                        <select 
+                                            value={newItemCategory} 
+                                            onChange={e => setNewItemCategory(e.target.value)}
+                                            className="w-full p-2 border rounded-lg text-sm bg-white outline-none"
+                                        >
+                                            {SERVICE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                        </select>
+                                    </div>
+
                                     <p className="text-xs font-bold text-slate-500 mb-2 uppercase">Set Prices per Duration (Optional)</p>
                                     {durations.length === 0 && <p className="text-xs text-red-400 italic">Add items to "Minutes" tab first to set prices.</p>}
                                     <div className="grid grid-cols-2 gap-2">
@@ -419,7 +442,13 @@
                                                         className="flex-1 p-2 border rounded text-sm bg-white focus:ring-2 focus:ring-logo-green-500 mr-2"
                                                     />
                                                 ) : (
-                                                    <span className="text-slate-700 font-medium">{item.name}</span>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-slate-700 font-medium">{item.name}</span>
+                                                        {/* ADDED: Show Category in List */}
+                                                        {activeTab === 'service' && item.category && (
+                                                            <span className="text-[10px] text-slate-400 uppercase">{item.category}</span>
+                                                        )}
+                                                    </div>
                                                 )}
                                                 
                                                 <div className="flex gap-1">
@@ -494,9 +523,9 @@
                                                         </div>
                                                     ) : (
                                                         <div className="flex flex-wrap gap-2 mt-1">
-                                                                <span className="bg-teal-50 text-teal-700 px-2 py-0.5 rounded border border-teal-100 font-bold">
-                                                                    Commission: {item.commissionRate !== undefined ? `${item.commissionRate}%` : 'N/A'}
-                                                                </span>
+                                                            <span className="bg-teal-50 text-teal-700 px-2 py-0.5 rounded border border-teal-100 font-bold">
+                                                                Commission: {item.commissionRate !== undefined ? `${item.commissionRate}%` : 'N/A'}
+                                                            </span>
                                                         </div>
                                                     )}
                                                 </div>
@@ -506,7 +535,7 @@
                             )}
                         </div>
                     </div>
-                      {modal.isOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60"><div className="bg-white rounded-xl p-6 max-w-sm"><h3 className="font-bold mb-2">{modal.title}</h3><p className="mb-4 text-sm">{modal.message}</p><div className="flex gap-2 justify-end">{modal.type==='confirm'&&<button onClick={closeModal} className="px-4 py-2 text-slate-500">Cancel</button>}<button onClick={modal.onConfirm||closeModal} className={`px-4 py-2 rounded text-white ${modal.confirmColor==='red'?'bg-red-500':'bg-logo-green-600'}`}>Okay</button></div></div></div>}
+                    {modal.isOpen && <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60"><div className="bg-white rounded-xl p-6 max-w-sm"><h3 className="font-bold mb-2">{modal.title}</h3><p className="mb-4 text-sm">{modal.message}</p><div className="flex gap-2 justify-end">{modal.type==='confirm'&&<button onClick={closeModal} className="px-4 py-2 text-slate-500">Cancel</button>}<button onClick={modal.onConfirm||closeModal} className={`px-4 py-2 rounded text-white ${modal.confirmColor==='red'?'bg-red-500':'bg-logo-green-600'}`}>Okay</button></div></div></div>}
                 </div>
             );
         };
@@ -577,7 +606,7 @@
             const [isOnline, setIsOnline] = useState(navigator.onLine);
             const [dbReady, setDbReady] = useState(false);
             const [configError, setConfigError] = useState(null);  
-            const [isGlobalLoading, setIsGlobalLoading] = useState(false); 
+            const [isGlobalLoading, setIsGlobalLoading] = useState(false);  
 
             const [user, setUser] = useState(null);
             const [users, setUsers] = useState([]);
@@ -596,7 +625,7 @@
             const [therapistsList, setTherapistsList] = useState([]);
             const [servicesList, setServicesList] = useState([]);
             const [durationsList, setDurationsList] = useState([]);
-            const [driversList, setDriversList] = useState([]); 
+            const [driversList, setDriversList] = useState([]);  
             const [roomsList, setRoomsList] = useState([]); // ADDED: Room List State
             
             const [view, setView] = useState('dashboard');
@@ -620,18 +649,18 @@
             // Added expense-related fields and viewType
             const [formData, setFormData] = useState({
                 clientName: '',  
-                clientContact: '', 
+                clientContact: '',  
                 service: '',  
                 therapist: '',  
                 amount: '',  
                 duration: '',  
-                type: 'booking', 
+                type: 'booking',  
                 time: new Date().toTimeString().slice(0, 5),
                 targetBranch: '',
                 notes: '',
-                category: '', 
-                bookingDate: getTodayStr(), 
-                location: 'spa', 
+                category: '',  
+                bookingDate: getTodayStr(),  
+                location: 'spa',  
                 transportFee: '',
                 driver: '',
                 room: '',
@@ -828,9 +857,9 @@
                         // Simple pin migration logic (kept from original)
                         const needsUpdate = data.filter(u => (u.username === 'admin' && u.pin.length < 20));
                         for (const u of needsUpdate) {
-                             if (u.pin === '8888' || u.pin === '888888') { 
-                                const hashedPin = await hashPin('888888'); 
-                                await getCollection('users').doc(u.id).update({ pin: hashedPin, role: 'admin' });  
+                             if (u.pin === '8888' || u.pin === '888888') {  
+                                 const hashedPin = await hashPin('888888');  
+                                 await getCollection('users').doc(u.id).update({ pin: hashedPin, role: 'admin' });  
                              }
                         }
                         setUsers(data);
@@ -878,8 +907,7 @@
                             return a.name.localeCompare(b.name);
                         }));
                     }, (error) => console.error("Sync Error: Rooms", error));
-
-
+                
                 return () => {  
                     unsubTrans();  
                     unsubUsers();  
@@ -889,13 +917,13 @@
                     unsubDrivers();
                     unsubRooms(); // Cleanup rooms
                 };
-            }, [fb, fbUser, isTransactionListenerActive, view, dashboardDate]); 
+            }, [fb, fbUser, isTransactionListenerActive, view, dashboardDate]);  
 
 
             // --- 2b. LAZY LOAD HISTORY ---
             useEffect(() => {
                 if (!fb || !fbUser || view !== 'history') {
-                    if (history.length > 0) setHistory([]); 
+                    if (history.length > 0) setHistory([]);  
                     return;
                 }
                 
@@ -913,7 +941,7 @@
                     });
 
                 return () => unsub();
-            }, [fb, fbUser, view]); 
+            }, [fb, fbUser, view]);  
 
             // --- 2c. REAL-TIME USER ROLE SYNC ---
             useEffect(() => {
@@ -937,12 +965,12 @@
                     const basePath = `artifacts/${fb.appId}/public/data`;
                     fb.db.collection(`${basePath}/users`).doc(user.id).update({
                         lastActive: firebase.firestore.FieldValue.serverTimestamp(),
-                        currentBranch: user.currentBranch 
+                        currentBranch: user.currentBranch  
                     }).catch(err => console.error("Presence update failed", err));
                 };
 
-                updatePresence(); 
-                const interval = setInterval(updatePresence, 60000); 
+                updatePresence();  
+                const interval = setInterval(updatePresence, 60000);  
 
                 return () => clearInterval(interval);
             }, [user, fb]);
@@ -956,6 +984,27 @@
 
             // --- 3. HELPERS ---
             
+            // ADDED: Helper to Group Services by Category
+            const groupedServices = useMemo(() => {
+                const groups = {};
+                // Initialize groups based on constants to ensure order
+                SERVICE_CATEGORIES.forEach(cat => groups[cat] = []);
+                
+                servicesList.forEach(s => {
+                    const cat = s.category || 'Others'; // Default to 'Others' if undefined
+                    if (!groups[cat]) {
+                        // If category not in standard list, put in 'Others' or create new group?  
+                        // Let's create new group to be safe, or just push to Others.
+                        // For now, let's force standard categories.
+                        if (groups['Others']) groups['Others'].push(s);
+                        else groups[cat] = [s];
+                    } else {
+                        groups[cat].push(s);
+                    }
+                });
+                return groups;
+            }, [servicesList]);
+
             const seedDefaultUsers = async (db, basePath) => {
                 const defaults = [
                     { name: 'Owner Admin', username: 'admin', pin: '888888', role: 'admin' },  
@@ -1012,10 +1061,10 @@
                 
                 if (view === 'dashboard') {
                     data = data.filter(t => {
-                        const recordDate = t.bookingDate || formatDate(t.timestamp); 
+                        const recordDate = t.bookingDate || formatDate(t.timestamp);  
                         let recordDateStr = '';
                         if (t.bookingDate) {
-                            recordDateStr = t.bookingDate; 
+                            recordDateStr = t.bookingDate;  
                         } else {
                             const d = new Date(getMillis(t.timestamp));
                             recordDateStr = d.toISOString().split('T')[0];
@@ -1040,12 +1089,12 @@
                 const netCash = completedRevenue - totalExpenses;
 
                 return {  
-                    totalRevenue: completedRevenue, 
+                    totalRevenue: completedRevenue,  
                     pendingValue,  
                     totalBookings,  
                     completedSales,
-                    totalExpenses, 
-                    netCash 
+                    totalExpenses,  
+                    netCash  
                 };
             }, [filteredTransactions]);
 
@@ -1079,7 +1128,7 @@
                         grouped[branch].netCash += amount;
                     } else if (t.type === 'expense') {
                         grouped[branch].totalExpenses += Math.abs(amount);
-                        grouped[branch].netCash += amount; 
+                        grouped[branch].netCash += amount;  
                     }
                 });
 
@@ -1089,7 +1138,7 @@
                     .sort((a, b) => {
                         const indexA = BRANCHES.indexOf(a.branch);
                         const indexB = BRANCHES.indexOf(b.branch);
-                        if (indexA === -1) return 1; 
+                        if (indexA === -1) return 1;  
                         if (indexB === -1) return -1;
                         return indexA - indexB;
                     });
@@ -1107,7 +1156,7 @@
                     if (!name) return;
 
                     const therapist = therapistsList.find(th => th.name === name);
-                    const rate = therapist?.commissionRate || 0; 
+                    const rate = therapist?.commissionRate || 0;  
 
                     if (!grouped[branch]) grouped[branch] = {};
                     if (!grouped[branch][name]) grouped[branch][name] = { name, count: 0, amount: 0, commission: 0, rate };
@@ -1182,7 +1231,7 @@
                 try {
                     const d = new Date(record.date);
                     if (!isNaN(d.getTime())) {
-                        dateStr = d.toLocaleDateString(); 
+                        dateStr = d.toLocaleDateString();  
                     }
                 } catch (e) {}
 
@@ -1195,17 +1244,17 @@
                         `"${t.time}"`,  
                         `"${t.clientName || ''}"`, // Client Name
                         `"${t.clientContact || ''}"`, // ADDED: Client Contact
-                        `"${t.description || ''}"`, 
-                        `"${t.service || t.category || ''}"`, 
+                        `"${t.description || ''}"`,  
+                        `"${t.service || t.category || ''}"`,  
                         `"${t.duration || ''}"`,  
-                        `"${t.therapist || ''}"`, 
-                        `"${t.driver || ''}"`, 
+                        `"${t.therapist || ''}"`,  
+                        `"${t.driver || ''}"`,  
                         `"${t.location === 'home' ? 'Home Service' : 'In Spa'}"`,
-                        `"${t.room || ''}"`, 
+                        `"${t.room || ''}"`,  
                         `"${t.paymentMethod || 'Cash'}"`, // ADDED: Payment Method
                         t.transportFee || '0',
-                        t.amount, 
-                        commissionAmount.toFixed(2), 
+                        t.amount,  
+                        commissionAmount.toFixed(2),  
                         t.status,  
                         `"${t.recordedBy || 'System'}"`,
                         `"${t.notes || ''}"`
@@ -1241,8 +1290,8 @@
                         ...prev,
                         [name]: {
                             service: formData.service,
-                            duration: formData.duration, 
-                            amount: formData.amount 
+                            duration: formData.duration,  
+                            amount: formData.amount  
                         }
                     }));
                 }
@@ -1294,7 +1343,15 @@
                 } else if (listType === 'service') {
                     collectionName = 'services';
                     checkList = servicesList;
-                    if (extraData) data.prices = extraData;  
+                    // UPDATED: Handle extraData which now contains prices AND category
+                    if (extraData) {
+                        if (extraData.prices || extraData.category) {
+                            data.prices = extraData.prices || {};
+                            data.category = extraData.category || 'Others';
+                        } else {
+                            data.prices = extraData; // Fallback
+                        }
+                    }  
                 } else if (listType === 'duration') {
                     collectionName = 'durations';
                     checkList = durationsList;
@@ -1328,7 +1385,7 @@
                 if (listType === 'therapist') collectionName = 'therapists';
                 else if (listType === 'service') collectionName = 'services';
                 else if (listType === 'duration') collectionName = 'durations';
-                else if (listType === 'driver') collectionName = 'drivers'; 
+                else if (listType === 'driver') collectionName = 'drivers';  
                 else if (listType === 'room') collectionName = 'rooms'; // ADDED
                 else return;
 
@@ -1337,7 +1394,7 @@
                 setModal({
                     isOpen: true, type: 'confirm', title: `Delete ${listType}?`, message: `Are you sure you want to permanently delete "${name}"?`, confirmColor: 'red',
                     onConfirm: async () => {
-                        closeModal(); 
+                        closeModal();  
                         setIsGlobalLoading(true);
                         try {
                             await fb.db.collection(`${basePath}/${collectionName}`).doc(id).delete();
@@ -1385,7 +1442,7 @@
                         setModal({ isOpen: true, type: 'alert', title: 'Duplicate Name', message: `The name "${updatedData.name}" is already in use by another ${listType}.`, onConfirm: closeModal, confirmColor: 'red' });
                         return;
                     }
-                    updatedData.name = newName.charAt(0).toUpperCase() + newName.slice(1); 
+                    updatedData.name = newName.charAt(0).toUpperCase() + newName.slice(1);  
                 }
 
                 const basePath = `artifacts/${fb.appId}/public/data`;
@@ -1473,7 +1530,7 @@
                     if (foundService) {
                         if (durationName && foundService.prices && foundService.prices[durationName]) {
                             basePrice = foundService.prices[durationName];
-                        } 
+                        }  
                         else if (foundService.price) {
                             basePrice = foundService.price;
                         }
@@ -1486,9 +1543,6 @@
             const handleServiceChange = (serviceName) => {
                 const newPrice = calculatePrice(serviceName, formData.duration, formData.transportFee);
                 setFormData({ ...formData, service: serviceName, amount: newPrice });
-                
-                // Optional: Update all existing rows if user changes main dropdown? 
-                // Let's NOT do that to preserve customizations. Main dropdown acts as default for NEW selections.
             };
 
             const handleDurationChange = (durationName) => {
@@ -1509,7 +1563,7 @@
                 let newRoom = formData.room;
 
                 if (loc === 'spa') {
-                    newTransport = ''; 
+                    newTransport = '';  
                     newDriver = ''; // Reset driver if in spa
                 } else {
                     newRoom = ''; // Reset room if home service
@@ -1546,13 +1600,13 @@
                 } else {
                     // Updated Validation for Multi-Therapist (Simplified)
                     if (!formData.clientName) {
-                         setModal({ isOpen: true, type: 'alert', title: 'Missing Information', message: 'Please enter a Client Name.', onConfirm: closeModal, confirmColor: 'red' });
-                         return;
+                           setModal({ isOpen: true, type: 'alert', title: 'Missing Information', message: 'Please enter a Client Name.', onConfirm: closeModal, confirmColor: 'red' });
+                           return;
                     }
 
                     if (selectedTherapists.length === 0) {
-                         setModal({ isOpen: true, type: 'alert', title: 'Missing Therapist', message: 'Please add at least one Therapist.', onConfirm: closeModal, confirmColor: 'red' });
-                         return;
+                           setModal({ isOpen: true, type: 'alert', title: 'Missing Therapist', message: 'Please add at least one Therapist.', onConfirm: closeModal, confirmColor: 'red' });
+                           return;
                     }
                     
                     // Validate individual rows
@@ -1570,7 +1624,7 @@
                         return allBookings.some(t =>  
                             t.therapist === thName &&  
                             t.time === formData.time &&
-                            (t.bookingDate || formatDate(t.timestamp)) === formData.bookingDate && 
+                            (t.bookingDate || formatDate(t.timestamp)) === formData.bookingDate &&  
                             t.type !== 'expense'
                         );
                     });
@@ -1591,14 +1645,14 @@
                 
                 if (transactionType === 'expense') {
                     transactionsToSave.push({
-                        clientName: formData.category, 
-                        description: formData.notes, 
-                        category: formData.category, 
+                        clientName: formData.category,  
+                        description: formData.notes,  
+                        category: formData.category,  
                         amount: baseAmount,
                         type: transactionType,
                         status: 'completed',
                         time: formData.time,
-                        bookingDate: formData.bookingDate, 
+                        bookingDate: formData.bookingDate,  
                         recordedBy: user.name,
                         branch: transactionBranch,
                         notes: formData.notes.trim(),
@@ -1620,17 +1674,17 @@
                         const finalRowAmount = rowServicePrice + splitTransport;
 
                         transactionsToSave.push({
-                            clientName: formData.clientName, 
-                            clientContact: formData.clientContact, 
-                            description: formData.notes, 
-                            service: row.service, 
+                            clientName: formData.clientName,  
+                            clientContact: formData.clientContact,  
+                            description: formData.notes,  
+                            service: row.service,  
                             therapist: thName,
-                            amount: finalRowAmount, 
-                            duration: row.duration, 
+                            amount: finalRowAmount,  
+                            duration: row.duration,  
                             type: transactionType,
                             status: transactionType === 'sale' ? 'completed' : 'pending',
                             time: formData.time,
-                            bookingDate: formData.bookingDate, 
+                            bookingDate: formData.bookingDate,  
                             recordedBy: user.name,
                             branch: transactionBranch,
                             notes: formData.notes.trim(),
@@ -1646,8 +1700,8 @@
                 if (!isOnline) {
                     const offlineItems = transactionsToSave.map(t => ({
                         ...t,
-                        localId: Date.now() + Math.random(), 
-                        timestamp: Date.now() 
+                        localId: Date.now() + Math.random(),  
+                        timestamp: Date.now()  
                     }));
                     
                     setOfflineQueue(prev => [...prev, ...offlineItems]);
@@ -1699,7 +1753,7 @@
             };
 
             const toggleStatus = async (t) => {
-                if (t.type === 'expense') return; 
+                if (t.type === 'expense') return;  
 
                 const basePath = `artifacts/${fb.appId}/public/data`;
                 const newStatus = t.status === 'pending' ? 'completed' : 'pending';
@@ -1763,7 +1817,7 @@
                             const transColl = fb.db.collection(`${basePath}/transactions`);
 
                             await historyColl.add({
-                                date: dashboardDate, 
+                                date: dashboardDate,  
                                 date_formatted: new Date(dashboardDate).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
                                 timestamp: new Date().toLocaleString(),
                                 timestamp_val: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1926,7 +1980,7 @@
                     
                     const updatedUser = { ...user, ...updateData };
                     setUser(updatedUser);
-                    localStorage.setItem('spa_user', JSON.stringify(updatedUser)); 
+                    localStorage.setItem('spa_user', JSON.stringify(updatedUser));  
                     setModal({ isOpen: true, type: 'alert', title: 'Updated', message: 'Credentials synced.', onConfirm: closeModal, confirmColor: 'logo-green' });
                 } catch (err) {
                     setModal({ isOpen: true, type: 'alert', title: 'Error', message: 'Failed to update profile.', confirmColor: 'red', onConfirm: closeModal });
@@ -2171,7 +2225,7 @@
                                              if (idxA === -1) return 1;
                                              if (idxB === -1) return -1;
                                              return idxA - idxB;
-                                          }).map(branch => (
+                                         }).map(branch => (
                                             <div key={branch} className="mb-4 last:mb-0">
                                                 {(user.currentBranch === 'ALL' || Object.keys(therapistStats).length > 1) && (
                                                     <h4 className="text-[10px] font-bold text-logo-green-700 uppercase mb-2 bg-logo-green-50 px-2 py-1 rounded inline-block">
@@ -2195,7 +2249,7 @@
                                                     ))}
                                                 </div>
                                             </div>
-                                          ))
+                                        ))
                                     )}
                                 </div>
 
@@ -2283,10 +2337,15 @@
                                                                     {t.paymentMethod && (
                                                                         <span className={`ml-1 flex items-center gap-1 px-1.5 py-0.5 rounded border text-[9px] font-bold uppercase ${
                                                                             t.paymentMethod === 'GCash' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                                                                            t.paymentMethod === 'Maya' ? 'bg-zinc-100 text-zinc-700 border-zinc-300' :
+                                                                            t.paymentMethod === 'BPI' ? 'bg-red-50 text-red-600 border-red-200' :
+                                                                            t.paymentMethod === 'Eastwest Bank' ? 'bg-amber-50 text-amber-600 border-amber-200' :
                                                                             t.paymentMethod === 'Card' ? 'bg-purple-50 text-purple-600 border-purple-200' :
                                                                             'bg-emerald-50 text-emerald-600 border-emerald-200'
                                                                         }`}>
                                                                             {t.paymentMethod === 'GCash' && <Icons.Smartphone size={8} />}
+                                                                            {t.paymentMethod === 'Maya' && <Icons.Smartphone size={8} />}
+                                                                            {(t.paymentMethod === 'BPI' || t.paymentMethod === 'Eastwest Bank') && <Icons.Landmark size={8} />}
                                                                             {t.paymentMethod === 'Card' && <Icons.CreditCard size={8} />}
                                                                             {t.paymentMethod === 'Cash' && <Icons.Banknote size={8} />}
                                                                             {t.paymentMethod}
@@ -2490,7 +2549,11 @@
                                                                     className="text-xs p-2 border border-slate-200 rounded-lg bg-slate-50 focus:bg-white focus:ring-1 focus:ring-logo-green-500 outline-none w-full"
                                                                 >
                                                                     <option value="" disabled>Select Service*</option>
-                                                                    {servicesList.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                                                    {Object.entries(groupedServices).map(([category, services]) => (
+                                                                        <optgroup key={category} label={category}>
+                                                                            {services.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                                                                        </optgroup>
+                                                                    ))}
                                                                 </select>
                                                                 <div className="grid grid-cols-2 gap-2">
                                                                     <select 
@@ -2567,21 +2630,25 @@
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 mb-2 block uppercase">Payment Method</label>
                                         <div className="grid grid-cols-3 gap-2">
-                                            {['Cash', 'GCash', 'Card'].map(method => (
+                                            {[
+                                                { label: 'Cash', icon: <Icons.Banknote size={18}/> },  
+                                                { label: 'GCash', icon: <Icons.Smartphone size={18}/> },  
+                                                { label: 'Maya', icon: <Icons.Smartphone size={18}/> },  
+                                                { label: 'BPI', icon: <Icons.Landmark size={18}/> },  
+                                                { label: 'Eastwest Bank', icon: <Icons.Landmark size={18}/> }
+                                            ].map(method => (
                                                 <button
                                                     type="button"
-                                                    key={method}
-                                                    onClick={() => setFormData({ ...formData, paymentMethod: method })}
-                                                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 text-xs font-bold transition-all ${
-                                                        formData.paymentMethod === method
-                                                            ? 'bg-slate-800 text-white border-slate-800 shadow-md'
+                                                    key={method.label}
+                                                    onClick={() => setFormData({ ...formData, paymentMethod: method.label })}
+                                                    className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-1 text-[10px] font-bold transition-all ${
+                                                        formData.paymentMethod === method.label
+                                                            ? 'bg-slate-800 text-white border-slate-800 shadow-md transform scale-[1.02]'
                                                             : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
                                                     }`}
                                                 >
-                                                   {method === 'Cash' && <Icons.Banknote size={18} />}
-                                                   {method === 'GCash' && <Icons.Smartphone size={18} />}
-                                                   {method === 'Card' && <Icons.CreditCard size={18} />}
-                                                   {method}
+                                                    {method.icon}
+                                                    <span className="text-center leading-tight">{method.label}</span>
                                                 </button>
                                             ))}
                                         </div>
@@ -2649,7 +2716,7 @@
                                 </form>
                             </div>
                         )}
-
+                        
                         {view === 'profile' && (
                             <div className="bg-white rounded-xl shadow-sm border border-logo-green-100 p-6 fade-in">
                                 <h3 className="font-bold text-slate-800 mb-4 flex gap-2"><Icons.UserCog className="text-logo-green-700"/> Profile</h3>
